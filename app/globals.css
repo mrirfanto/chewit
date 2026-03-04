@@ -124,3 +124,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Flashcard 3D Flip Animation */
+@layer utilities {
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .preserve-3d,
+  .backface-hidden,
+  .rotate-y-180 {
+    transition: none !important;
+    transform: none !important;
+  }
+}

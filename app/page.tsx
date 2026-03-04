@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Zap, AlertCircle, Loader2 } from "lucide-react";
+import { saveMockDataToSession } from "@/mocks/data";
 
 // ============ Types ============
 
@@ -131,6 +133,7 @@ export default function HomePage() {
   const [content, setContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
 
   // Computed values
   const wordCount = countWords(content);
@@ -162,14 +165,16 @@ export default function HomePage() {
     if (!validation.isValid || isLoading) return;
 
     setIsLoading(true);
-    // TODO: Will be implemented in Phase 4 - API integration
-    console.log("Generating flashcards from:", content.substring(0, 100));
 
-    // Simulate loading for demo
+    // Phase 2: Use mock data
+    saveMockDataToSession();
+
+    // Simulate loading for better UX
     setTimeout(() => {
       setIsLoading(false);
-    }, 2000);
-  }, [validation.isValid, isLoading, content]);
+      router.push("/study/flashcards");
+    }, 800);
+  }, [validation.isValid, isLoading, router]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -177,7 +182,7 @@ export default function HomePage() {
       // Ctrl/Cmd + Enter to generate
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        if (!isGenerateDisabled) {
+        if (!isGenerateDisabled && handleGenerate) {
           handleGenerate();
         }
       }
@@ -189,7 +194,7 @@ export default function HomePage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [content, isGenerateDisabled]);
+  }, [content, isGenerateDisabled, handleGenerate]);
 
   // ============ Render ============
 
