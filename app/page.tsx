@@ -1,65 +1,370 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Zap, AlertCircle, Loader2 } from "lucide-react";
+
+// ============ Types ============
+
+interface ValidationState {
+  isValid: boolean;
+  error: string | null;
+}
+
+// ============ Constants ============
+
+const MIN_WORDS = 200;
+
+// Sample content for "Try an example" feature (~400 words)
+const SAMPLE_CONTENT = `# React Hooks: A Comprehensive Introduction
+
+React Hooks are functions that let you "hook into" React state and lifecycle features from function components. They were introduced in React 16.8 to solve several problems with class components.
+
+## The Problem with Class Components
+
+Before Hooks, if you wanted to add state to a function component, you had to convert it to a class. Classes could be confusing for both developers and tools. They also made it hard to reuse stateful logic between components.
+
+## useState Hook
+
+The useState hook lets you add state to function components. It takes an initial value and returns an array with two elements: the current state value and a function to update it.
+
+Example:
+\`\`\`javascript
+const [count, setCount] = useState(0);
+\`\`\`
+
+The count variable holds the current state, and setCount is the function you call to update it. Unlike this.setState in classes, useState doesn't merge objects—it replaces them.
+
+## useEffect Hook
+
+The useEffect hook lets you perform side effects in function components. Side effects include data fetching, subscriptions, or manually changing the DOM. It serves the same purpose as componentDidMount, componentDidUpdate, and componentWillUnmount in React classes.
+
+useEffect takes two arguments: a function and an optional dependency array. The function runs after the render is committed to the screen.
+
+By default, effects run after every render. However, you can control when effects run by providing a dependency array. If any value in the array changes between renders, the effect runs again.
+
+## Rules of Hooks
+
+Hooks have two important rules: only call them at the top level (don't call inside loops, conditions, or nested functions), and only call them from React function components or custom hooks.
+
+## Custom Hooks
+
+You can create your own hooks to reuse stateful logic between components. Custom hooks start with "use" and can call other hooks if they follow the rules of Hooks.
+
+## Conclusion
+
+Hooks simplify React code by making function components more powerful and eliminating the need for classes in most cases. They provide a more direct API to React concepts you already know: props, state, context, refs, and lifecycle.`;
+const MAX_WORDS = 10000;
+const RECOMMENDED_MIN_WORDS = 500;
+const RECOMMENDED_MAX_WORDS = 5000;
+
+// ============ Helpers ============
+
+function countWords(text: string): number {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0).length;
+}
+
+function validateInput(text: string): ValidationState {
+  const wordCount = countWords(text);
+
+  if (wordCount === 0) {
+    return { isValid: false, error: null };
+  }
+
+  if (wordCount < MIN_WORDS) {
+    return {
+      isValid: false,
+      error: `Content is too short. Please provide at least ${MIN_WORDS} words (currently: ${wordCount} words).`,
+    };
+  }
+
+  if (wordCount > MAX_WORDS) {
+    return {
+      isValid: false,
+      error: `Content is too long. Please keep it under ${MAX_WORDS} words (currently: ${wordCount} words).`,
+    };
+  }
+
+  return { isValid: true, error: null };
+}
+
+function getWordCountColor(wordCount: number): string {
+  if (wordCount < MIN_WORDS) return "text-red-500";
+  if (wordCount < RECOMMENDED_MIN_WORDS) return "text-amber-500";
+  if (wordCount > MAX_WORDS) return "text-red-500";
+  if (wordCount > RECOMMENDED_MAX_WORDS) return "text-amber-500";
+  return "text-green-600";
+}
+
+function getWordCountMessage(wordCount: number): string {
+  if (wordCount === 0) return "Start typing to see word count";
+  if (wordCount < MIN_WORDS)
+    return `${MIN_WORDS - wordCount} more words needed`;
+  if (wordCount < RECOMMENDED_MIN_WORDS) return "Getting there...";
+  if (wordCount > MAX_WORDS) return `${wordCount - MAX_WORDS} words over limit`;
+  if (wordCount > RECOMMENDED_MAX_WORDS) return "Still usable, but getting long";
+  return "Perfect length";
+}
+
+function getWordCountProgress(wordCount: number): number {
+  if (wordCount === 0) return 0;
+  // Scale progress from 0 to 100 based on RECOMMENDED range
+  const min = RECOMMENDED_MIN_WORDS;
+  const max = RECOMMENDED_MAX_WORDS;
+  if (wordCount <= min) return (wordCount / min) * 50;
+  if (wordCount >= max) return 100;
+  return 50 + ((wordCount - min) / (max - min)) * 50;
+}
+
+// ============ Main Component ============
+
+export default function HomePage() {
+  // State
+  const [content, setContent] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Computed values
+  const wordCount = countWords(content);
+  const validation = validateInput(content);
+  const wordCountColor = getWordCountColor(wordCount);
+  const wordCountMessage = getWordCountMessage(wordCount);
+  const isGenerateDisabled = !validation.isValid || isLoading;
+
+  // Handlers
+  const handleContentChange = (value: string) => {
+    setContent(value);
+  };
+
+  const handleClear = () => {
+    setContent("");
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  const handleTryExample = () => {
+    setContent(SAMPLE_CONTENT);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  const handleGenerate = useCallback(() => {
+    if (!validation.isValid || isLoading) return;
+
+    setIsLoading(true);
+    // TODO: Will be implemented in Phase 4 - API integration
+    console.log("Generating flashcards from:", content.substring(0, 100));
+
+    // Simulate loading for demo
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+  }, [validation.isValid, isLoading, content]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Enter to generate
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!isGenerateDisabled) {
+          handleGenerate();
+        }
+      }
+      // Escape to clear (if not empty)
+      if (e.key === "Escape" && content.length > 0) {
+        handleClear();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [content, isGenerateDisabled]);
+
+  // ============ Render ============
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="w-full max-w-3xl">
+        {/* Hero Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-semibold text-slate-900 mb-3 tracking-tight">
+            Turn Reading into Remembering
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            Paste articles, notes, or transcripts and get AI-generated
+            flashcards and quizzes in seconds. Study smarter, not harder.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={handleTryExample}
+            className="mt-4 text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Try an example
+          </button>
         </div>
-      </main>
+
+        {/* Input Card */}
+        <Card className="bg-white border-slate-200 p-6">
+          <div className="space-y-4">
+            {/* Textarea */}
+            <div className="space-y-2">
+              <Textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => handleContentChange(e.target.value)}
+                placeholder="Paste your content here...
+
+Articles • Notes • Transcripts • Docs • Anything you want to learn
+
+Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS} words."
+                className={`
+                  w-full min-h-[400px] px-6 py-4
+                  bg-white border-slate-200 rounded-xl
+                  text-slate-900 text-base leading-relaxed
+                  placeholder:text-slate-400
+                  focus:ring-2 focus:ring-slate-400 focus:border-transparent
+                  resize-none
+                  transition-all duration-150
+                  ${validation.error ? "border-red-300 focus:ring-red-400" : ""}
+                `}
+                disabled={isLoading}
+                aria-label="Content input for flashcard generation"
+                aria-describedby={
+                  validation.error ? "input-error" : "word-count"
+                }
+              />
+
+              {/* Validation Error */}
+              <div className="min-h-[72px]">
+                {validation.error && (
+                  <Alert variant="destructive" id="input-error" role="alert">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{validation.error}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </div>
+
+            {/* Word Count & Actions */}
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+              {/* Word Count */}
+              <div className="flex items-center gap-3 flex-1">
+                <div
+                  id="word-count"
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">Words:</span>
+                    <Badge variant={validation.isValid ? "default" : "secondary"} className="font-semibold">
+                      {wordCount.toLocaleString()}
+                    </Badge>
+                  </div>
+                  {wordCount > 0 && (
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Progress
+                        value={getWordCountProgress(wordCount)}
+                        className="h-2 flex-1"
+                        aria-label="Word count progress"
+                      />
+                      <span className={`text-xs font-medium whitespace-nowrap ${wordCountColor}`}>
+                        {wordCountMessage}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                {/* Clear Button */}
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={handleClear}
+                  disabled={content.length === 0 || isLoading}
+                  className="
+                    px-6 py-3
+                    bg-transparent border-slate-200
+                    text-slate-700 text-sm font-medium
+                    hover:bg-slate-50 hover:border-slate-300
+                    active:bg-slate-100
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-colors duration-150
+                  "
+                  aria-label="Clear content"
+                >
+                  Clear
+                </Button>
+
+                {/* Generate Button */}
+                <Button
+                  variant="default"
+                  size="default"
+                  onClick={handleGenerate}
+                  disabled={isGenerateDisabled}
+                  className="
+                    px-6 py-3
+                    bg-slate-900 border-slate-900
+                    text-white text-sm font-medium
+                    hover:bg-slate-800
+                    active:bg-slate-900
+                    focus:ring-2 focus:ring-slate-400 focus:ring-offset-2
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-900
+                    transition-colors duration-150
+                    min-h-[44px]
+                  "
+                  aria-label="Generate flashcards"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Generate Flashcards
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Helper Text */}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-500 text-center">
+                Ideal: {RECOMMENDED_MIN_WORDS.toLocaleString()}-
+                {RECOMMENDED_MAX_WORDS.toLocaleString()} words • Limits:{" "}
+                {MIN_WORDS}-{MAX_WORDS.toLocaleString()} words • Press{" "}
+                <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">
+                  Ctrl+Enter
+                </kbd>{" "}
+                to generate
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="mt-6 text-center" aria-live="polite">
+            <p className="text-sm text-slate-600">
+              Creating your flashcards... This usually takes 10-20 seconds.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -15,27 +15,37 @@
 ## 🚀 Quick Reference
 
 ### Project Status
-- **Current Phase**: Phase 1 — Home Page + Content Input
-- **Progress**: 8/153 tasks (5%)
-- **Total Time**: ~1 hour
+- **Current Phase**: Phase 2 — UI/UX with Mock Data
+- **Progress**: 16/153 tasks (10%)
+- **Total Time**: ~3 hours
+- **Latest**: Phase 1 complete with UX improvements and component migration
 
 ### Tech Stack
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS + shadcn/ui
+- Lucide React (icons)
 - Claude API (Haiku)
 - localStorage (MVP)
+
+### Installed shadcn Components
+- Button, Card, Input, Textarea, Progress
+- Skeleton, Alert, Badge (added Phase 1)
 
 ### Folder Structure
 ```
 chewit/
-├── app/              # Next.js pages
-├── components/       # React components
-├── lib/             # Utilities
-├── types/           # TypeScript types
-├── hooks/           # Custom hooks
-├── docs/            # This folder
-└── public/          # Static assets
+├── app/                    # Next.js pages
+│   ├── page.tsx           # Home page (✅ Phase 1 complete)
+│   └── study/             # Study routes (Phase 2)
+├── components/
+│   ├── ui/                # shadcn components (9 installed)
+│   └── shared/            # Shared components
+├── lib/                   # Utilities
+├── types/                 # TypeScript types
+├── hooks/                 # Custom hooks
+├── docs/                  # Documentation
+└── public/                # Static assets
 ```
 
 ## 🎯 Development Workflow
