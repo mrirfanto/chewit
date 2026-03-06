@@ -8,10 +8,10 @@
 
 | Metric | Value |
 |--------|-------|
-| **Current Phase** | Phase 4: Frontend Connected (Phase 3 Complete) |
+| **Current Phase** | Phase 5: localStorage Persistence (Phases 0-4 Complete) |
 | **Last Updated** | 2026-03-06 |
-| **Roadmap Progress** | 67/153 tasks completed (44%) |
-| **Total Time Spent** | ~6.5 hours |
+| **Roadmap Progress** | 77/153 tasks completed (50%) |
+| **Total Time Spent** | ~7 hours |
 
 ---
 
@@ -363,7 +363,7 @@
 - $5 credit will last ~1,750 sessions
 
 **Updated Progress:**
-- Phases 0-3: Fully functional ✅
+- Phases 0-4: Fully functional ✅
 - **Total: 67/153 tasks (44%)**
 
 **Next Session:**
@@ -374,6 +374,45 @@
 - None
 
 ---
+
+### 2026-03-06 — Session: Phase 4 Complete
+
+**Duration:** ~30 minutes (completed during Phase 3 implementation)
+**Phase:** Phase 4: Connect Frontend to API ✅ COMPLETED
+
+**Completed:**
+- ✅ 4.1: Added form submission handler to home page
+- ✅ 4.2: Called `/api/generate` on form submit with error handling
+- ✅ 4.3: Show loading state during generation
+- ✅ 4.4: Stored generated data in sessionStorage
+- ✅ 4.5: Handled API errors with user-friendly messages
+- ✅ 4.6: Redirected to `/study/flashcards` on success
+- ✅ 4.7: Flashcard page loads from sessionStorage
+- ✅ 4.8: Quiz page loads from sessionStorage
+- ✅ 4.9: Results page loads from sessionStorage
+- ✅ 4.10: Tested full flow: paste text → generate → flashcards → quiz → results
+
+**Implementation:**
+- Updated `handleGenerate` in home page to call real API
+- Used fetch API with proper error handling
+- Saved response to sessionStorage for study pages
+- Alert for errors (TODO: improve to inline error state)
+
+**Updated Progress:**
+- Phase 0-4: 77 tasks complete ✅
+- **Total: 77/153 tasks (50%)**
+- **MVP HALFWAY THERE! 🎉**
+
+**Next Session:**
+- Phase 5: localStorage Persistence
+- Save generated decks for later use
+- Display saved decks on home page
+
+**Open Questions:**
+- None
+
+---
+
 ## Decisions Log
 
 ### 2026-03-03
@@ -400,6 +439,16 @@
 - [x] Quiz generation (API) ✅ (Phase 3 complete)
 - [x] Quiz mode (UI + feedback) ✅ (Phase 2 complete)
 - [x] Score summary screen ✅ (Phase 2 complete)
+
+### 2026-03-06 (Phase 4 Complete)
+- ✅ Phase 4: Connect Frontend to API — ALL 10 TASKS COMPLETED
+- Home page now calls real API instead of mock data
+- Form submission with error handling
+- Loading states during generation
+- Session storage for generated data
+- Full flow tested: paste → generate → flashcards → quiz → results
+- **MVP HALFWAY COMPLETE: 77/153 tasks (50%)** 🎉
+
 - [ ] localStorage persistence
 
 ### Polish
@@ -493,6 +542,15 @@
 
 ### 2026-03-06 (Phase 2 Complete)
 - ✅ Phase 2: UI/UX with Mock Data — ALL 40 TASKS COMPLETED
+
+### 2026-03-06 (Phase 4 Complete)
+- ✅ Phase 4: Connect Frontend to API — ALL 10 TASKS COMPLETED
+- Home page now calls real API instead of mock data
+- Form submission with error handling
+- Loading states during generation
+- Session storage for generated data
+- Full flow tested: paste → generate → flashcards → quiz → results
+- **MVP HALFWAY COMPLETE: 77/153 tasks (50%)** 🎉
 - Verified full study flow works end-to-end
 - Tested all features: flashcard flip, quiz mode, results, retry
 - Updated progress to 56/153 tasks (37%)
