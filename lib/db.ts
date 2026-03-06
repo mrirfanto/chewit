@@ -261,3 +261,44 @@ export async function listDecks() {
     throw error;
   }
 }
+
+/**
+ * Update a deck's title
+ * @param deckId - The UUID of the deck to update
+ * @param newTitle - The new title for the deck
+ * @throws Error if validation fails or database operation fails
+ */
+export async function updateDeckTitle(deckId: string, newTitle: string): Promise<void> {
+  // Input validation
+  if (!deckId || deckId.trim().length === 0) {
+    throw new ValidationError('Deck ID is required', 'deckId');
+  }
+  if (!newTitle || newTitle.trim().length === 0) {
+    throw new ValidationError('Deck title is required', 'title');
+  }
+
+  try {
+    const { error } = await supabase
+      .from('decks')
+      .update({ title: newTitle.trim() })
+      .eq('id', deckId);
+
+    if (error) {
+      throw new DatabaseError(
+        'Failed to update deck title',
+        error.code || 'DB_ERROR',
+        error
+      );
+    }
+  } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) {
+      throw error;
+    }
+    console.error('Error updating deck title:', error);
+    throw new DatabaseError(
+      'Failed to update deck title',
+      'UNKNOWN_ERROR',
+      error
+    );
+  }
+}

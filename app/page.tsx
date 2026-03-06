@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock } from 'lucide-react';
+import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2 } from 'lucide-react';
 
 // ============ Types ============
 
@@ -153,6 +153,9 @@ export default function HomePage() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [decksLoading, setDecksLoading] = useState<boolean>(true);
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState<string>('');
+  const [editLoading, setEditLoading] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -230,6 +233,63 @@ export default function HomePage() {
       console.error('Error loading deck:', error);
       alert('Failed to load deck. Please try again.');
       setLoadingDeckId(null);
+    }
+  };
+
+  const handleStartEdit = (deckId: string, currentTitle: string) => {
+    setEditingId(deckId);
+    setEditTitle(currentTitle);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const handleSaveEdit = async (deckId: string) => {
+    if (!editTitle.trim()) {
+      alert('Deck title cannot be empty');
+      return;
+    }
+
+    setEditLoading(true);
+
+    try {
+      const response = await fetch(`/api/decks/${deckId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle.trim() }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to update deck title');
+      }
+
+      // Update local state
+      setDecks(decks.map((deck) =>
+        deck.id === deckId ? { ...deck, title: editTitle.trim() } : deck
+      ));
+
+      setEditingId(null);
+      setEditTitle('');
+    } catch (error) {
+      console.error('Error updating deck title:', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update deck title. Please try again.'
+      );
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleKeyDownEdit = (e: React.KeyboardEvent<HTMLInputElement>, deckId: string) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit(deckId);
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
     }
   };
 
@@ -525,9 +585,50 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-slate-900 mb-1 truncate">
-                          {deck.title}
-                        </h3>
+                        {editingId === deck.id ? (
+                          <div className="flex items-center gap-2 mb-1">
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              onKeyDown={(e) => handleKeyDownEdit(e, deck.id)}
+                              className="flex-1 px-3 py-1.5 text-lg font-semibold border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+                              autoFocus
+                              disabled={editLoading}
+                              aria-label="Edit deck title"
+                            />
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleSaveEdit(deck.id)}
+                                disabled={editLoading}
+                                className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                aria-label="Save edit"
+                              >
+                                {editLoading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleCancelEdit}
+                                disabled={editLoading}
+                                className="h-8 w-8 p-0 text-slate-600 hover:text-slate-700 hover:bg-slate-100"
+                                aria-label="Cancel edit"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <h3 className="text-lg font-semibold text-slate-900 mb-1 truncate">
+                            {deck.title}
+                          </h3>
+                        )}
                         <div className="flex items-center gap-2 text-sm text-slate-500">
                           <Clock className="w-4 h-4" />
                           <span>{formatDate(deck.created_at)}</span>
@@ -538,7 +639,7 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                         <Button
                           size="sm"
                           onClick={() => handleLoadDeck(deck.id)}
-                          disabled={loadingDeckId === deck.id}
+                          disabled={loadingDeckId === deck.id || editingId === deck.id}
                           className="bg-slate-900 hover:bg-slate-800 text-white"
                         >
                           {loadingDeckId === deck.id ? (
@@ -550,19 +651,34 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                             'Study'
                           )}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteDeck(deck.id, deck.title)}
-                          disabled={loadingDeckId !== null}
-                          className="border-slate-200 text-slate-700 hover:bg-slate-50"
-                        >
-                          {loadingDeckId === deck.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
+                        {editingId !== deck.id && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartEdit(deck.id, deck.title)}
+                              disabled={loadingDeckId !== null}
+                              className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                              aria-label="Edit deck title"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteDeck(deck.id, deck.title)}
+                              disabled={loadingDeckId !== null}
+                              className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                              aria-label="Delete deck"
+                            >
+                              {loadingDeckId === deck.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Card>

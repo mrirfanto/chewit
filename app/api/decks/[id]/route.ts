@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDeck, deleteDeck } from '@/lib/db';
+import { getDeck, deleteDeck, updateDeckTitle } from '@/lib/db';
 
 /**
  * GET /api/decks/[id]
@@ -34,6 +34,64 @@ export async function GET(
         error: {
           code: 'GET_DECK_ERROR',
           message: error instanceof Error ? error.message : 'Failed to fetch deck',
+        }
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/decks/[id]
+ * Update a deck's title
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: deckId } = await params;
+
+    if (!deckId) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_ID',
+            message: 'Deck ID is required',
+          }
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { title } = body;
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_TITLE',
+            message: 'Deck title is required',
+          }
+        },
+        { status: 400 }
+      );
+    }
+
+    await updateDeckTitle(deckId, title);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Deck title updated successfully',
+    });
+  } catch (error) {
+    console.error('Error updating deck title:', error);
+    return NextResponse.json(
+      {
+        error: {
+          code: 'UPDATE_DECK_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to update deck title',
         }
       },
       { status: 500 }
