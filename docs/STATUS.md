@@ -8,10 +8,10 @@
 
 | Metric | Value |
 |--------|-------|
-| **Current Phase** | Phase 2: UI/UX with Mock Data |
-| **Last Updated** | 2026-03-04 |
-| **Roadmap Progress** | 32/153 tasks completed (21%) |
-| **Total Time Spent** | ~4 hours |
+| **Current Phase** | Phase 4: Frontend Connected (Phase 3 Complete) |
+| **Last Updated** | 2026-03-06 |
+| **Roadmap Progress** | 67/153 tasks completed (44%) |
+| **Total Time Spent** | ~6.5 hours |
 
 ---
 
@@ -232,6 +232,148 @@
 
 ---
 
+### 2026-03-06 — Session: Phase 2 Completion
+
+**Duration:** ~1 hour
+**Phase:** Phase 2: UI/UX with Mock Data ✅ COMPLETED
+
+**Completed:**
+- ✅ Verified full study flow works end-to-end (home → flashcards → quiz → results)
+- ✅ All 40 Phase 2 tasks completed (2.1-2.40)
+- ✅ Features validated:
+  - Flashcard 3D flip animation with smooth transitions
+  - Quiz mode with immediate feedback and scoring
+  - Results page with retry functionality
+  - Session timer and progress tracking
+  - Keyboard navigation throughout
+  - Responsive mobile layout
+  - Reduced motion support for accessibility
+
+**Code Quality:**
+- All TypeScript types properly defined
+- Clean component structure with proper hooks
+- Proper error handling for missing session data
+- Build verified: ✅ Successful
+
+**Testing Performed:**
+- Verified flashcard flip animation works smoothly
+- Tested quiz flow with correct and incorrect answers
+- Verified results page shows accurate scoring
+- Tested "Retry Wrong Answers" functionality
+- Verified shuffle button randomizes card order
+- Confirmed keyboard shortcuts work (Space, arrows, number keys)
+
+**Updated Progress:**
+- Phase 0: 8 tasks ✅
+- Phase 1: 8 tasks ✅
+- Phase 2: 40 tasks ✅
+- **Total: 56/153 tasks (37%)**
+
+**Next Session:**
+- Start Phase 3: API Route + Claude Integration
+- Create `/api/generate/route.ts` with POST handler
+- Implement Claude API integration for flashcard and quiz generation
+- Add Zod validation for request/response
+- Replace mock data with real API calls
+
+**Open Questions:**
+- None
+
+---
+
+
+### 2026-03-06 — Session: Phase 3 Complete
+
+**Duration:** ~1 hour
+**Phase:** Phase 3: API Route + Claude Integration ✅ COMPLETED
+
+**Completed:**
+- ✅ Created `/api/generate/route.ts` with full POST handler
+- ✅ Implemented Zod validation for requests and responses
+- ✅ Added flashcard generation prompt
+- ✅ Added MCQ quiz generation prompt
+- ✅ Initialized Anthropic client with API key
+- ✅ Built generation functions with retry logic (2 attempts, exponential backoff)
+- ✅ Implemented JSON parsing with markdown cleanup
+- ✅ Added comprehensive error handling (validation, API errors, parse errors)
+- ✅ Updated home page to call real API instead of mock data
+- ✅ Added mock mode fallback for development (USE_MOCK_DATA flag)
+- ✅ Created .env.example for documentation
+
+**API Route Features:**
+- Mock mode support for development without API costs
+- Validates input: 200-10,000 characters
+- Generates exactly 10 flashcards with word limits
+- Generates exactly 5 questions with 4 options each
+- Retry logic with exponential backoff
+- Clean error messages with proper HTTP status codes
+
+**Testing:**
+- Build verified: ✅ Successful
+- API route created at `/api/generate`
+- Home page now calls real API
+- Mock mode works for testing
+- Ready for real API calls
+
+**Updated Progress:**
+- Phase 0-2: 56 tasks ✅
+- Phase 3: 11 tasks ✅
+- **Total: 67/153 tasks (44%)**
+
+**Configuration:**
+- ✅ Claude API key configured in .env.local
+- ✅ USE_MOCK_DATA=false (using real API)
+- ✅ Model: claude-haiku-4-5-20251001
+
+**Next Session:**
+- Test with real content and API calls
+- Consider starting Phase 5: localStorage Persistence
+
+**Open Questions:**
+- None
+---
+
+### 2026-03-06 — Session: Phase 3 Testing & Bug Fixes
+
+**Duration:** ~30 minutes
+**Phase:** Phase 3: API Integration ✅ VERIFIED WORKING
+
+**Completed:**
+- ✅ Fixed JSON parsing error in Claude API responses
+- ✅ Added system prompts to API calls (FLASHCARD_SYSTEM_PROMPT, QUIZ_SYSTEM_PROMPT)
+- ✅ Improved cleanJSONResponse function to extract JSON arrays from responses
+- ✅ Added debug logging for raw and cleaned responses
+- ✅ Successfully tested real Claude API integration
+- ✅ Generated flashcards and quiz from actual content
+
+**Bug Fixes:**
+- Fixed "Failed to parse flashcard JSON" error
+- Added proper system prompts to Claude API calls
+- Enhanced JSON cleaning to handle edge cases
+
+**Testing Results:**
+- ✅ API integration working correctly
+- ✅ Flashcard generation successful with real Claude API
+- ✅ Quiz generation successful
+- ✅ Full study flow: API → Flashcards → Quiz → Results
+
+**API Cost:**
+- Tested with real API calls
+- Cost per session: ~$0.003 (as expected)
+- $5 credit will last ~1,750 sessions
+
+**Updated Progress:**
+- Phases 0-3: Fully functional ✅
+- **Total: 67/153 tasks (44%)**
+
+**Next Session:**
+- Phase 5: localStorage Persistence
+- Or continue with remaining phases
+
+**Open Questions:**
+- None
+
+---
 ## Decisions Log
 
 ### 2026-03-03
@@ -253,18 +395,19 @@
 
 ### Core Features
 - [x] Text input form ✅ (Phase 1 complete)
-- [ ] Flashcard generation (API)
+- [x] Flashcard generation (API) ✅ (Phase 3 complete)
 - [x] Flashcard mode (UI + flip animation) ✅ (Phase 2 complete)
-- [ ] Quiz generation (API)
+- [x] Quiz generation (API) ✅ (Phase 3 complete)
 - [x] Quiz mode (UI + feedback) ✅ (Phase 2 complete)
 - [x] Score summary screen ✅ (Phase 2 complete)
 - [ ] localStorage persistence
 
 ### Polish
-- [ ] Mobile responsiveness
-- [ ] Error handling
-- [ ] Loading states
-- [ ] Animations
+- [x] Mobile responsiveness (UI/UX phase)
+- [x] Error handling (UI/UX phase)
+- [x] Loading states (UI/UX phase)
+- [x] Animations (UI/UX phase)
+- [x] API error handling ✅ (Phase 3 complete)
 
 ---
 
@@ -286,6 +429,15 @@
 - **Node version:** (to be filled)
 - **Package manager:** npm (will decide during setup)
 - **Next.js version:** 14.x (App Router)
+
+
+### 2026-03-06 (Phase 3 Testing & Bug Fixes)
+- Fixed JSON parsing error in Claude API responses
+- Added system prompts to ensure proper JSON formatting
+- Improved cleanJSONResponse to extract JSON arrays
+- Successfully tested real Claude API integration
+- Verified full study flow works with real API
+- Confirmed API costs: ~$0.003 per session
 
 ### API Configuration
 - **Model:** claude-haiku-4-5-20251001
@@ -327,6 +479,24 @@
 ---
 
 ## Changelog
+
+
+### 2026-03-06 (Phase 3 Complete)
+- ✅ Phase 3: API Route + Claude Integration — ALL 11 TASKS COMPLETED
+- Created `/api/generate` endpoint with Claude API integration
+- Implemented Zod validation for requests and responses
+- Added flashcard and MCQ quiz generation prompts
+- Built retry logic with exponential backoff
+- Home page now calls real API instead of mock data
+- Mock mode fallback for development (USE_MOCK_DATA flag)
+- Updated progress to 67/153 tasks (44%)
+
+### 2026-03-06 (Phase 2 Complete)
+- ✅ Phase 2: UI/UX with Mock Data — ALL 40 TASKS COMPLETED
+- Verified full study flow works end-to-end
+- Tested all features: flashcard flip, quiz mode, results, retry
+- Updated progress to 56/153 tasks (37%)
+- Ready to begin Phase 3: API Integration
 
 ### 2026-03-04 (Phase 2)
 - Built complete study flow with mock data

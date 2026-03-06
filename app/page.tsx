@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Zap, AlertCircle, Loader2 } from "lucide-react";
-import { saveMockDataToSession } from "@/mocks/data";
 
 // ============ Types ============
 
@@ -161,20 +160,46 @@ export default function HomePage() {
     }
   };
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback(async () => {
     if (!validation.isValid || isLoading) return;
 
     setIsLoading(true);
 
-    // Phase 2: Use mock data
-    saveMockDataToSession();
+    try {
+      // Call the API to generate flashcards and quiz
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sourceText: content }),
+      });
 
-    // Simulate loading for better UX
-    setTimeout(() => {
-      setIsLoading(false);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Failed to generate flashcards");
+      }
+
+      const data = await response.json();
+
+      // Save to sessionStorage for study pages
+      const sessionData = {
+        flashcards: data.flashcards,
+        quiz: data.quiz,
+      };
+      sessionStorage.setItem("chewit_study_data", JSON.stringify(sessionData));
+
+      // Navigate to flashcards page
       router.push("/study/flashcards");
-    }, 800);
-  }, [validation.isValid, isLoading, router]);
+
+    } catch (error) {
+      console.error("Generation error:", error);
+      // TODO: Show error to user (add error state)
+      alert(error instanceof Error ? error.message : "Failed to generate flashcards. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [content, validation.isValid, isLoading, router]);
 
   // Keyboard shortcuts
   useEffect(() => {
