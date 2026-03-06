@@ -7,10 +7,10 @@ import { getDeck, deleteDeck } from '@/lib/db';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const deckId = params.id;
+    const { id: deckId } = await params;
 
     if (!deckId) {
       return NextResponse.json(
@@ -47,10 +47,10 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const deckId = params.id;
+    const { id: deckId } = await params;
 
     if (!deckId) {
       return NextResponse.json(

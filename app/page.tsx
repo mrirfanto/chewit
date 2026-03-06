@@ -465,6 +465,86 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
               </p>
             </div>
           )}
+
+          {/* Recent Decks Section */}
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-semibold text-slate-900">Your Decks</h2>
+              {decks.length > 0 && (
+                <Badge variant="secondary" className="text-sm">
+                  {decks.length} {decks.length === 1 ? 'Deck' : 'Decks'}
+                </Badge>
+              )}
+            </div>
+
+            {/* Loading Skeleton */}
+            {decksLoading && (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="bg-white border-slate-200 p-6">
+                    <div className="space-y-3">
+                      <div className="h-6 bg-slate-100 rounded animate-pulse w-3/4"></div>
+                      <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2"></div>
+                      <div className="h-9 bg-slate-100 rounded animate-pulse w-32 mt-4"></div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!decksLoading && decks.length === 0 && (
+              <Card className="bg-white border-slate-200 p-12 text-center">
+                <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">No decks yet</h3>
+                <p className="text-slate-500 mb-4">
+                  Generate your first deck to get started! Paste your content above and click Generate.
+                </p>
+              </Card>
+            )}
+
+            {/* Deck List */}
+            {!decksLoading && decks.length > 0 && (
+              <div className="space-y-3">
+                {decks.map((deck) => (
+                  <Card
+                    key={deck.id}
+                    className="bg-white border-slate-200 p-6 hover:border-slate-300 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1 truncate">
+                          {deck.title}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <Clock className="w-4 h-4" />
+                          <span>{formatDate(deck.created_at)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleLoadDeck(deck.id)}
+                          className="bg-slate-900 hover:bg-slate-800 text-white"
+                        >
+                          Study
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteDeck(deck.id, deck.title)}
+                          className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
