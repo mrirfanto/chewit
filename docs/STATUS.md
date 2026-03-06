@@ -580,6 +580,24 @@
 - Added keyboard shortcuts (Ctrl+Enter, Escape)
 - Updated progress to 16/153 tasks (10%)
 
+
+### 2026-03-06
+
+**Decision:** Skip localStorage, use Supabase directly for persistence
+**Context:** Original roadmap had Phase 5 as localStorage persistence
+**Choice:** Implement Supabase integration instead of localStorage
+**Rationale:**
+- localStorage has 5-10MB limit and can be cleared by users
+- Supabase provides proper cloud database (PostgreSQL)
+- Enables cross-device access to saved decks
+- Better foundation for future features (auth, sharing, real-time)
+- Free tier is generous (1GB, 50k MAU)
+- Only ~4 hours vs ~2 hours for localStorage, but much more value
+- Storage is cheap and scales properly
+**Reversible:** Yes — could add localStorage as cache layer if needed
+
+---
+
 ### 2026-03-03
 - Created STATUS.md for session tracking
 - Added decision log template

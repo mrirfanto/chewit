@@ -12,6 +12,9 @@
 | **[CONVENTIONS](CONVENTIONS.md)** | Code style, file organization, Git conventions, testing strategy | 2026-03-03 |
 | **[DESIGN](DESIGN.md)** | Design system — colors, typography, components, Notion-like aesthetic | 2026-03-03 |
 
-## 🚀 Quick Reference
-
-
+| **[SUPABASE_PLAN](SUPABASE_PLAN.md)** | Supabase integration plan — database schema, setup, implementation phases
+| | **[STATUS]## 🚀 Quick Reference
+| **[SUPABASE_PLAN](SUPABASE_PLAN.md)** | Supabase integration plan — database schema, setup, implementation phases
+| | **[STATUS]
+| **[SUPABASE_PLAN](SUPABASE_PLAN.md)** | Supabase integration plan — database schema, setup, implementation phases
+| | **[STATUS]
