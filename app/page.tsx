@@ -152,6 +152,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [decksLoading, setDecksLoading] = useState<boolean>(true);
+  const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -191,6 +192,8 @@ export default function HomePage() {
   const handleDeleteDeck = async (deckId: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
 
+    setLoadingDeckId(deckId);
+
     try {
       const response = await fetch(`/api/decks/${deckId}`, {
         method: 'DELETE',
@@ -201,10 +204,14 @@ export default function HomePage() {
     } catch (error) {
       console.error('Error deleting deck:', error);
       alert('Failed to delete deck. Please try again.');
+    } finally {
+      setLoadingDeckId(null);
     }
   };
 
   const handleLoadDeck = async (deckId: string) => {
+    setLoadingDeckId(deckId);
+
     try {
       const response = await fetch(`/api/decks/${deckId}`);
       if (!response.ok) throw new Error('Failed to load deck');
@@ -222,6 +229,7 @@ export default function HomePage() {
     } catch (error) {
       console.error('Error loading deck:', error);
       alert('Failed to load deck. Please try again.');
+      setLoadingDeckId(null);
     }
   };
 
@@ -530,17 +538,30 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                         <Button
                           size="sm"
                           onClick={() => handleLoadDeck(deck.id)}
+                          disabled={loadingDeckId === deck.id}
                           className="bg-slate-900 hover:bg-slate-800 text-white"
                         >
-                          Study
+                          {loadingDeckId === deck.id ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            'Study'
+                          )}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleDeleteDeck(deck.id, deck.title)}
+                          disabled={loadingDeckId !== null}
                           className="border-slate-200 text-slate-700 hover:bg-slate-50"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {loadingDeckId === deck.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </Button>
                       </div>
                     </div>

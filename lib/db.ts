@@ -5,6 +5,7 @@
 
 import { supabase } from './supabase';
 import { Flashcard, Question } from '@/types';
+import { DatabaseError, ValidationError } from './errors';
 
 // ============ Types ============
 
@@ -41,19 +42,40 @@ export interface SaveDeckParams {
  * @throws Error if database operation fails
  */
 export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
+  // Input validation
+  if (!params.title || params.title.trim().length === 0) {
+    throw new ValidationError('Deck title is required', 'title');
+  }
+  if (!params.source_text || params.source_text.trim().length === 0) {
+    throw new ValidationError('Source text is required', 'source_text');
+  }
+  if (params.flashcards.length === 0 && params.quiz_questions.length === 0) {
+    throw new ValidationError('Deck must have at least one flashcard or quiz question');
+  }
+
   try {
     // 1. Create deck
     const { data: deck, error: deckError } = await supabase
       .from('decks')
       .insert({
-        title: params.title,
-        source_text: params.source_text,
-        topic_name: params.topic_name || null,
+        title: params.title.trim(),
+        source_text: params.source_text.trim(),
+        topic_name: params.topic_name?.trim() || null,
       })
       .select()
       .single();
 
-    if (deckError) throw deckError;
+    if (deckError) {
+      throw new DatabaseError(
+        'Failed to save deck',
+        deckError.code || 'DB_ERROR',
+        deckError
+      );
+    }
+
+    if (!deck || !deck.id) {
+      throw new DatabaseError('Failed to save deck: No ID returned', 'NO_ID');
+    }
 
     // 2. Create flashcards
     if (params.flashcards.length > 0) {
@@ -68,7 +90,13 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
         .from('flashcards')
         .insert(flashcardsWithDeckId);
 
-      if (flashcardsError) throw flashcardsError;
+      if (flashcardsError) {
+        throw new DatabaseError(
+          'Failed to save flashcards',
+          flashcardsError.code || 'DB_ERROR',
+          flashcardsError
+        );
+      }
     }
 
     // 3. Create quiz questions
@@ -85,13 +113,26 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
         .from('quiz_questions')
         .insert(questionsWithDeckId);
 
-      if (questionsError) throw questionsError;
+      if (questionsError) {
+        throw new DatabaseError(
+          'Failed to save quiz questions',
+          questionsError.code || 'DB_ERROR',
+          questionsError
+        );
+      }
     }
 
     return deck;
   } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) {
+      throw error;
+    }
     console.error('Error saving deck:', error);
-    throw error;
+    throw new DatabaseError(
+      'Failed to save deck',
+      'UNKNOWN_ERROR',
+      error
+    );
   }
 }
 
@@ -102,6 +143,11 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
  * @throws Error if deck not found or database operation fails
  */
 export async function getDeck(deckId: string): Promise<DeckWithRelations> {
+  // Input validation
+  if (!deckId || deckId.trim().length === 0) {
+    throw new ValidationError('Deck ID is required', 'deckId');
+  }
+
   try {
     const { data: deck, error: deckError } = await supabase
       .from('decks')
@@ -113,16 +159,29 @@ export async function getDeck(deckId: string): Promise<DeckWithRelations> {
       .eq('id', deckId)
       .single();
 
-    if (deckError) throw deckError;
+    if (deckError) {
+      throw new DatabaseError(
+        `Deck with ID ${deckId} not found`,
+        deckError.code || 'NOT_FOUND',
+        deckError
+      );
+    }
 
     if (!deck) {
-      throw new Error(`Deck with ID ${deckId} not found`);
+      throw new DatabaseError(`Deck with ID ${deckId} not found`, 'PGRST116');
     }
 
     return deck as DeckWithRelations;
   } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) {
+      throw error;
+    }
     console.error('Error fetching deck:', error);
-    throw error;
+    throw new DatabaseError(
+      'Failed to fetch deck',
+      'UNKNOWN_ERROR',
+      error
+    );
   }
 }
 
@@ -133,16 +192,34 @@ export async function getDeck(deckId: string): Promise<DeckWithRelations> {
  * @throws Error if database operation fails
  */
 export async function deleteDeck(deckId: string): Promise<void> {
+  // Input validation
+  if (!deckId || deckId.trim().length === 0) {
+    throw new ValidationError('Deck ID is required', 'deckId');
+  }
+
   try {
     const { error } = await supabase
       .from('decks')
       .delete()
       .eq('id', deckId);
 
-    if (error) throw error;
+    if (error) {
+      throw new DatabaseError(
+        'Failed to delete deck',
+        error.code || 'DB_ERROR',
+        error
+      );
+    }
   } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) {
+      throw error;
+    }
     console.error('Error deleting deck:', error);
-    throw error;
+    throw new DatabaseError(
+      'Failed to delete deck',
+      'UNKNOWN_ERROR',
+      error
+    );
   }
 }
 
