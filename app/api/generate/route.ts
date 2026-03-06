@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { Flashcard, Question } from "@/types";
+import { saveDeck } from "@/lib/db";
 
 // ============ Mock Mode ============
 
@@ -89,6 +90,11 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function generateTitle(sourceText: string): string {
+  const words = sourceText.trim().split(/\s+/).slice(0, 5);
+  return words.join(" ") + "...";
+}
+
 function cleanJSONResponse(text: string): string {
   let cleaned = text.trim();
   
@@ -174,7 +180,20 @@ export async function POST(request: NextRequest) {
         id: q.id || generateId("q"),
       }));
 
+      // Generate title and save to Supabase
+      const deckTitle = validated.topicName || generateTitle(validated.sourceText);
+      const savedDeck = await saveDeck({
+        title: deckTitle,
+        source_text: validated.sourceText,
+        topic_name: validated.topicName,
+        flashcards: flashcardsWithIds,
+        quiz_questions: questionsWithIds,
+      });
+      console.log("Mock deck saved with ID:", savedDeck.id);
+
       return NextResponse.json({
+        deckId: savedDeck.id,
+        deckTitle: savedDeck.title,
         flashcards: flashcardsWithIds,
         quiz: questionsWithIds,
       });
@@ -264,8 +283,22 @@ export async function POST(request: NextRequest) {
       answer: q.answer,
     }));
 
-    // 8. Return response
+    // 8. Save to Supabase
+    console.log("Saving deck to Supabase...");
+    const deckTitle = validated.topicName || generateTitle(validated.sourceText);
+    const savedDeck = await saveDeck({
+      title: deckTitle,
+      source_text: validated.sourceText,
+      topic_name: validated.topicName,
+      flashcards: flashcards,
+      quiz_questions: quiz,
+    });
+    console.log("Deck saved with ID:", savedDeck.id);
+
+    // 9. Return response with deck ID
     return NextResponse.json({
+      deckId: savedDeck.id,
+      deckTitle: savedDeck.title,
       flashcards,
       quiz,
     });

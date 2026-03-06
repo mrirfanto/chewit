@@ -23,13 +23,6 @@ export interface DeckWithRelations extends Deck {
   quiz_questions: Question[];
 }
 
-export interface DeckListItem {
-  id: string;
-  title: string;
-  created_at: string;
-  flashcards: { count: number | null } | null;
-  quiz_questions: { count: number | null } | null;
-}
 
 export interface SaveDeckParams {
   title: string;
@@ -133,32 +126,6 @@ export async function getDeck(deckId: string): Promise<DeckWithRelations> {
   }
 }
 
-/**
- * List all decks with counts of flashcards and questions
- * @returns Array of decks ordered by creation date (newest first)
- * @throws Error if database operation fails
- */
-export async function listDecks(): Promise<DeckListItem[]> {
-  try {
-    const { data, error } = await supabase
-      .from('decks')
-      .select(`
-        id,
-        title,
-        created_at,
-        flashcards (count),
-        quiz_questions (count)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error listing decks:', error);
-    throw error;
-  }
-}
 
 /**
  * Delete a deck and all its related data (cascade)
@@ -194,5 +161,26 @@ export async function testConnection(): Promise<boolean> {
   } catch (error) {
     console.error('Database connection test failed:', error);
     return false;
+  }
+}
+
+/**
+ * List all decks (basic info only)
+ * @returns Array of decks ordered by creation date (newest first)
+ * @throws Error if database operation fails
+ */
+export async function listDecks() {
+  try {
+    const { data, error } = await supabase
+      .from('decks')
+      .select('id, title, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data || [];
+  } catch (error) {
+    console.error('Error listing decks:', error);
+    throw error;
   }
 }

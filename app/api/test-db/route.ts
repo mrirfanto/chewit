@@ -32,8 +32,7 @@ export async function GET() {
         decks: decks.map(deck => ({
           id: deck.id,
           title: deck.title,
-          flashcardCount: deck.flashcards?.count || 0,
-          quizCount: deck.quiz_questions?.count || 0,
+          createdAt: deck.created_at,
         })),
       },
     });
