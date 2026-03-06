@@ -159,7 +159,6 @@ export async function POST(request: NextRequest) {
 
     // 3. Check if using mock mode
     if (USE_MOCK) {
-      console.log("Using mock data mode");
       const mockData = await getMockData();
 
       if (!mockData) {
@@ -189,7 +188,6 @@ export async function POST(request: NextRequest) {
         flashcards: flashcardsWithIds,
         quiz_questions: questionsWithIds,
       });
-      console.log("Mock deck saved with ID:", savedDeck.id);
 
       return NextResponse.json({
         deckId: savedDeck.id,
@@ -217,23 +215,18 @@ export async function POST(request: NextRequest) {
     const anthropic = new Anthropic({ apiKey });
 
     // 6. Generate flashcards
-    console.log("Generating flashcards...");
     const flashcardResponse = await callClaudeWithRetry(anthropic, [
       { role: "user", content: `${FLASHCARD_SYSTEM_PROMPT}\n\nGenerate exactly 10 flashcards from the following content:\n\n${validated.sourceText}` }
     ]);
 
-    // Log raw response for debugging
-    console.log("Raw flashcard response:", flashcardResponse.substring(0, 500));
-
     const cleanedFlashcards = cleanJSONResponse(flashcardResponse);
-    console.log("Cleaned flashcard response:", cleanedFlashcards.substring(0, 500));
 
     let parsedFlashcards;
 
     try {
       parsedFlashcards = JSON.parse(cleanedFlashcards);
     } catch (parseError) {
-      console.error("Failed to parse flashcard JSON:", cleanedFlashcards);
+      console.error("Failed to parse flashcard JSON:", cleanedFlashcards.substring(0, 200));
       console.error("Parse error:", parseError);
       throw new Error("Failed to parse flashcard JSON from Claude response");
     }
@@ -241,7 +234,7 @@ export async function POST(request: NextRequest) {
     // Validate flashcards
     const validatedFlashcards = z.array(FlashcardSchema).safeParse(parsedFlashcards);
     if (!validatedFlashcards.success) {
-      console.error("Flashcard validation failed:", validatedFlashcards.error);
+      console.error("Flashcard validation failed:", validatedFlashcards.error.format());
       throw new Error("Generated flashcards do not match required schema");
     }
 
@@ -253,7 +246,6 @@ export async function POST(request: NextRequest) {
     }));
 
     // 7. Generate quiz
-    console.log("Generating quiz...");
     const quizResponse = await callClaudeWithRetry(anthropic, [
       { role: "user", content: `${QUIZ_SYSTEM_PROMPT}\n\nGenerate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}` }
     ]);
@@ -264,14 +256,14 @@ export async function POST(request: NextRequest) {
     try {
       parsedQuiz = JSON.parse(cleanedQuiz);
     } catch (parseError) {
-      console.error("Failed to parse quiz JSON:", cleanedQuiz);
+      console.error("Failed to parse quiz JSON:", cleanedQuiz.substring(0, 200));
       throw new Error("Failed to parse quiz JSON from Claude response");
     }
 
     // Validate quiz
     const validatedQuiz = z.array(QuestionSchema).safeParse(parsedQuiz);
     if (!validatedQuiz.success) {
-      console.error("Quiz validation failed:", validatedQuiz.error);
+      console.error("Quiz validation failed:", validatedQuiz.error.format());
       throw new Error("Generated quiz does not match required schema");
     }
 
@@ -284,7 +276,6 @@ export async function POST(request: NextRequest) {
     }));
 
     // 8. Save to Supabase
-    console.log("Saving deck to Supabase...");
     const deckTitle = validated.topicName || generateTitle(validated.sourceText);
     const savedDeck = await saveDeck({
       title: deckTitle,
@@ -293,7 +284,6 @@ export async function POST(request: NextRequest) {
       flashcards: flashcards,
       quiz_questions: quiz,
     });
-    console.log("Deck saved with ID:", savedDeck.id);
 
     // 9. Return response with deck ID
     return NextResponse.json({

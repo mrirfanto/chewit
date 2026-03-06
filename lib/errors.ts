@@ -2,6 +2,11 @@
  * Custom error types for better error handling
  */
 
+/**
+ * Custom error class for database-related errors
+ * @example
+ * throw new DatabaseError('Failed to save deck', 'PGRST116', originalError);
+ */
 export class DatabaseError extends Error {
   constructor(
     message: string,
