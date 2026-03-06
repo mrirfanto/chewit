@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Zap, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock } from 'lucide-react';
 
 // ============ Types ============
 
@@ -17,6 +17,11 @@ interface ValidationState {
   error: string | null;
 }
 
+interface Deck {
+  id: string;
+  title: string;
+  created_at: string;
+}
 // ============ Constants ============
 
 const MIN_WORDS = 200;
@@ -98,21 +103,35 @@ function validateInput(text: string): ValidationState {
 }
 
 function getWordCountColor(wordCount: number): string {
-  if (wordCount < MIN_WORDS) return "text-red-500";
-  if (wordCount < RECOMMENDED_MIN_WORDS) return "text-amber-500";
-  if (wordCount > MAX_WORDS) return "text-red-500";
-  if (wordCount > RECOMMENDED_MAX_WORDS) return "text-amber-500";
-  return "text-green-600";
+  if (wordCount < MIN_WORDS) return 'text-red-500';
+  if (wordCount < RECOMMENDED_MIN_WORDS) return 'text-amber-500';
+  if (wordCount > MAX_WORDS) return 'text-red-500';
+  if (wordCount > RECOMMENDED_MAX_WORDS) return 'text-amber-500';
+  return 'text-green-600';
 }
 
 function getWordCountMessage(wordCount: number): string {
-  if (wordCount === 0) return "Start typing to see word count";
-  if (wordCount < MIN_WORDS)
-    return `${MIN_WORDS - wordCount} more words needed`;
-  if (wordCount < RECOMMENDED_MIN_WORDS) return "Getting there...";
+  if (wordCount === 0) return 'Start typing to see word count';
+  if (wordCount < MIN_WORDS) return `${MIN_WORDS - wordCount} more words needed`;
+  if (wordCount < RECOMMENDED_MIN_WORDS) return 'Getting there...';
   if (wordCount > MAX_WORDS) return `${wordCount - MAX_WORDS} words over limit`;
-  if (wordCount > RECOMMENDED_MAX_WORDS) return "Still usable, but getting long";
-  return "Perfect length";
+  if (wordCount > RECOMMENDED_MAX_WORDS) return 'Still usable, but getting long';
+  return 'Perfect length';
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
 }
 
 function getWordCountProgress(wordCount: number): number {
@@ -129,8 +148,10 @@ function getWordCountProgress(wordCount: number): number {
 
 export default function HomePage() {
   // State
-  const [content, setContent] = useState<string>("");
+  const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [decksLoading, setDecksLoading] = useState<boolean>(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -147,16 +168,58 @@ export default function HomePage() {
   };
 
   const handleClear = () => {
-    setContent("");
+    setContent('');
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   };
 
-  const handleTryExample = () => {
-    setContent(SAMPLE_CONTENT);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
+  const loadDecks = useCallback(async () => {
+    try {
+      setDecksLoading(true);
+      const response = await fetch('/api/decks');
+      if (!response.ok) throw new Error('Failed to load decks');
+      const data = await response.json();
+      setDecks(data.decks);
+    } catch (error) {
+      console.error('Error loading decks:', error);
+    } finally {
+      setDecksLoading(false);
+    }
+  }, []);
+
+  const handleDeleteDeck = async (deckId: string, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+
+    try {
+      const response = await fetch(`/api/decks/${deckId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete deck');
+
+      setDecks(decks.filter((d) => d.id !== deckId));
+    } catch (error) {
+      console.error('Error deleting deck:', error);
+      alert('Failed to delete deck. Please try again.');
+    }
+  };
+
+  const handleLoadDeck = async (deckId: string) => {
+    try {
+      const response = await fetch(`/api/decks/${deckId}`);
+      if (!response.ok) throw new Error('Failed to load deck');
+      const data = await response.json();
+
+      const sessionData = {
+        flashcards: data.flashcards,
+        quiz: data.quiz_questions,
+      };
+      sessionStorage.setItem('chewit_study_data', JSON.stringify(sessionData));
+
+      router.push('/study/flashcards');
+    } catch (error) {
+      console.error('Error loading deck:', error);
+      alert('Failed to load deck. Please try again.');
     }
   };
 
@@ -166,98 +229,105 @@ export default function HomePage() {
     setIsLoading(true);
 
     try {
-      // Call the API to generate flashcards and quiz
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceText: content }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error?.message || "Failed to generate flashcards");
+        throw new Error(error.error?.message || 'Failed to generate flashcards');
       }
 
       const data = await response.json();
 
-      // Save to sessionStorage for study pages
       const sessionData = {
         flashcards: data.flashcards,
         quiz: data.quiz,
       };
-      sessionStorage.setItem("chewit_study_data", JSON.stringify(sessionData));
+      sessionStorage.setItem('chewit_study_data', JSON.stringify(sessionData));
 
-      // Navigate to flashcards page
-      router.push("/study/flashcards");
-
+      await loadDecks();
+      router.push('/study/flashcards');
     } catch (error) {
-      console.error("Generation error:", error);
-      // TODO: Show error to user (add error state)
-      alert(error instanceof Error ? error.message : "Failed to generate flashcards. Please try again.");
+      console.error('Generation error:', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate flashcards. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [content, validation.isValid, isLoading, router]);
+  }, [content, validation.isValid, isLoading, router, loadDecks]);
+
+  const handleTryExample = () => {
+    setContent(SAMPLE_CONTENT);
+  };
+
+  // Load decks on mount
+  useEffect(() => {
+    loadDecks();
+  }, [loadDecks]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl/Cmd + Enter to generate
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         if (!isGenerateDisabled && handleGenerate) {
           handleGenerate();
         }
       }
       // Escape to clear (if not empty)
-      if (e.key === "Escape" && content.length > 0) {
+      if (e.key === 'Escape' && content.length > 0) {
         handleClear();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [content, isGenerateDisabled, handleGenerate]);
 
   // ============ Render ============
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-3xl">
-        {/* Hero Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-semibold text-slate-900 mb-3 tracking-tight">
-            Turn Reading into Remembering
-          </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Paste articles, notes, or transcripts and get AI-generated
-            flashcards and quizzes in seconds. Study smarter, not harder.
-          </p>
-          <button
-            onClick={handleTryExample}
-            className="mt-4 text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
-          >
-            Try an example
-          </button>
-        </div>
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-50 px-4 py-12">
+        <div className="w-full max-w-3xl">
+          {/* Hero Section */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-semibold text-slate-900 mb-3 tracking-tight">
+              Turn Reading into Remembering
+            </h1>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+              Paste articles, notes, or transcripts and get AI-generated flashcards and quizzes in
+              seconds. Study smarter, not harder.
+            </p>
+            <button
+              onClick={handleTryExample}
+              className="mt-4 text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
+            >
+              Try an example
+            </button>
+          </div>
 
-        {/* Input Card */}
-        <Card className="bg-white border-slate-200 p-6">
-          <div className="space-y-4">
-            {/* Textarea */}
-            <div className="space-y-2">
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={(e) => handleContentChange(e.target.value)}
-                placeholder="Paste your content here...
+          {/* Input Card */}
+          <Card className="bg-white border-slate-200 p-6">
+            <div className="space-y-4">
+              {/* Textarea */}
+              <div className="space-y-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  placeholder="Paste your content here...
 
 Articles • Notes • Transcripts • Docs • Anything you want to learn
 
 Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS} words."
-                className={`
+                  className={`
                   w-full min-h-[400px] px-6 py-4
                   bg-white border-slate-200 rounded-xl
                   text-slate-900 text-base leading-relaxed
@@ -265,65 +335,66 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                   focus:ring-2 focus:ring-slate-400 focus:border-transparent
                   resize-none
                   transition-all duration-150
-                  ${validation.error ? "border-red-300 focus:ring-red-400" : ""}
+                  ${validation.error ? 'border-red-300 focus:ring-red-400' : ''}
                 `}
-                disabled={isLoading}
-                aria-label="Content input for flashcard generation"
-                aria-describedby={
-                  validation.error ? "input-error" : "word-count"
-                }
-              />
+                  disabled={isLoading}
+                  aria-label="Content input for flashcard generation"
+                  aria-describedby={validation.error ? 'input-error' : 'word-count'}
+                />
 
-              {/* Validation Error */}
-              <div className="min-h-[72px]">
-                {validation.error && (
-                  <Alert variant="destructive" id="input-error" role="alert">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{validation.error}</AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </div>
-
-            {/* Word Count & Actions */}
-            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-              {/* Word Count */}
-              <div className="flex items-center gap-3 flex-1">
-                <div
-                  id="word-count"
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1"
-                  aria-live="polite"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500">Words:</span>
-                    <Badge variant={validation.isValid ? "default" : "secondary"} className="font-semibold">
-                      {wordCount.toLocaleString()}
-                    </Badge>
-                  </div>
-                  {wordCount > 0 && (
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Progress
-                        value={getWordCountProgress(wordCount)}
-                        className="h-2 flex-1"
-                        aria-label="Word count progress"
-                      />
-                      <span className={`text-xs font-medium whitespace-nowrap ${wordCountColor}`}>
-                        {wordCountMessage}
-                      </span>
-                    </div>
+                {/* Validation Error */}
+                <div className="min-h-[72px]">
+                  {validation.error && (
+                    <Alert variant="destructive" id="input-error" role="alert">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{validation.error}</AlertDescription>
+                    </Alert>
                   )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3">
-                {/* Clear Button */}
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={handleClear}
-                  disabled={content.length === 0 || isLoading}
-                  className="
+              {/* Word Count & Actions */}
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                {/* Word Count */}
+                <div className="flex items-center gap-3 flex-1">
+                  <div
+                    id="word-count"
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-500">Words:</span>
+                      <Badge
+                        variant={validation.isValid ? 'default' : 'secondary'}
+                        className="font-semibold"
+                      >
+                        {wordCount.toLocaleString()}
+                      </Badge>
+                    </div>
+                    {wordCount > 0 && (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Progress
+                          value={getWordCountProgress(wordCount)}
+                          className="h-2 flex-1"
+                          aria-label="Word count progress"
+                        />
+                        <span className={`text-xs font-medium whitespace-nowrap ${wordCountColor}`}>
+                          {wordCountMessage}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  {/* Clear Button */}
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={handleClear}
+                    disabled={content.length === 0 || isLoading}
+                    className="
                     px-6 py-3
                     bg-transparent border-slate-200
                     text-slate-700 text-sm font-medium
@@ -332,18 +403,18 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                     disabled:opacity-50 disabled:cursor-not-allowed
                     transition-colors duration-150
                   "
-                  aria-label="Clear content"
-                >
-                  Clear
-                </Button>
+                    aria-label="Clear content"
+                  >
+                    Clear
+                  </Button>
 
-                {/* Generate Button */}
-                <Button
-                  variant="default"
-                  size="default"
-                  onClick={handleGenerate}
-                  disabled={isGenerateDisabled}
-                  className="
+                  {/* Generate Button */}
+                  <Button
+                    variant="default"
+                    size="default"
+                    onClick={handleGenerate}
+                    disabled={isGenerateDisabled}
+                    className="
                     px-6 py-3
                     bg-slate-900 border-slate-900
                     text-white text-sm font-medium
@@ -354,47 +425,47 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                     transition-colors duration-150
                     min-h-[44px]
                   "
-                  aria-label="Generate flashcards"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Generate Flashcards
-                    </>
-                  )}
-                </Button>
+                    aria-label="Generate flashcards"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Generate Flashcards
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Helper Text */}
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-xs text-slate-500 text-center">
+                    Ideal: {RECOMMENDED_MIN_WORDS.toLocaleString()}-
+                    {RECOMMENDED_MAX_WORDS.toLocaleString()} words • Limits: {MIN_WORDS}-
+                    {MAX_WORDS.toLocaleString()} words • Press{' '}
+                    <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">
+                      Ctrl+Enter
+                    </kbd>{' '}
+                    to generate
+                  </p>
+                </div>
               </div>
             </div>
+          </Card>
 
-            {/* Helper Text */}
-            <div className="pt-2 border-t border-slate-100">
-              <p className="text-xs text-slate-500 text-center">
-                Ideal: {RECOMMENDED_MIN_WORDS.toLocaleString()}-
-                {RECOMMENDED_MAX_WORDS.toLocaleString()} words • Limits:{" "}
-                {MIN_WORDS}-{MAX_WORDS.toLocaleString()} words • Press{" "}
-                <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">
-                  Ctrl+Enter
-                </kbd>{" "}
-                to generate
+          {/* Loading State */}
+          {isLoading && (
+            <div className="mt-6 text-center" aria-live="polite">
+              <p className="text-sm text-slate-600">
+                Creating your flashcards... This usually takes 10-20 seconds.
               </p>
             </div>
-          </div>
-        </Card>
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="mt-6 text-center" aria-live="polite">
-            <p className="text-sm text-slate-600">
-              Creating your flashcards... This usually takes 10-20 seconds.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
 }
