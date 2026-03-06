@@ -27,7 +27,7 @@
   Navigate to: Settings → API
   Copy these values to .env.local:
   - NEXT_PUBLIC_SUPABASE_URL
-  - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
   - SUPABASE_SERVICE_ROLE_KEY
   ```
 
@@ -41,9 +41,9 @@
   import { createClient } from '@supabase/supabase-js';
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
 
-  export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  export const supabase = createClient(supabaseUrl, supabaseKey);
   ```
 
 - [ ] **1.5** Create `decks` table in Supabase SQL Editor
@@ -116,7 +116,7 @@
   ```typescript
   // Add console.log to lib/supabase.ts
   console.log('Supabase URL configured:', !!supabaseUrl);
-  console.log('Anon key configured:', !!supabaseAnonKey);
+  console.log('Anon key configured:', !!supabaseKey);
   ```
 
 ---
