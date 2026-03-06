@@ -211,6 +211,8 @@ export default function HomePage() {
       const data = await response.json();
 
       const sessionData = {
+        deckId: data.id,
+        deckTitle: data.title,
         flashcards: data.flashcards,
         quiz: data.quiz_questions,
       };
@@ -243,6 +245,8 @@ export default function HomePage() {
       const data = await response.json();
 
       const sessionData = {
+        deckId: data.deckId,
+        deckTitle: data.deckTitle,
         flashcards: data.flashcards,
         quiz: data.quiz,
       };

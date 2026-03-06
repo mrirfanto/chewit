@@ -118,6 +118,8 @@ export const mockQuizQuestions: Question[] = [
 // ============ Combined Mock Data ============
 
 export interface MockStudyData {
+  deckId?: string;
+  deckTitle?: string;
   flashcards: Flashcard[];
   quiz: Question[];
 }
@@ -137,12 +139,23 @@ export function saveMockDataToSession(): void {
   }
 }
 
+/**
+ * Load study data from sessionStorage
+ * Returns data with optional deckId and deckTitle if loaded from Supabase
+ */
 export function loadMockDataFromSession(): MockStudyData | null {
   if (typeof window !== "undefined") {
     const data = sessionStorage.getItem(SESSION_STORAGE_KEY);
     return data ? JSON.parse(data) : null;
   }
   return null;
+}
+
+/**
+ * Alias for loadMockDataFromSession with more semantic name
+ */
+export function loadStudyDataFromSession(): MockStudyData | null {
+  return loadMockDataFromSession();
 }
 
 export function clearSessionData(): void {

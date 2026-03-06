@@ -23,6 +23,7 @@ export default function ResultsPage() {
   // State
   const [results, setResults] = useState<QuizResults | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [deckTitle, setDeckTitle] = useState<string>("");
 
   // Load results and questions on mount
   useEffect(() => {
@@ -38,20 +39,59 @@ export default function ResultsPage() {
     if (studyData?.quiz) {
       setQuestions(studyData.quiz);
     }
+
+    // Load deck title if available
+    if (studyData?.deckTitle) {
+      setDeckTitle(studyData.deckTitle);
+    }
   }, [router]);
 
   // Handlers
-  const handleRetryWrong = () => {
+  const handleRetryWrong = async () => {
     if (!results || !questions.length) return;
 
-    // Filter questions to only incorrect answers
+    // Check if we have a deckId to reload from Supabase
+    const studyData = loadMockDataFromSession();
+
+    if (studyData?.deckId) {
+      try {
+        // Reload full deck from Supabase
+        const response = await fetch(`/api/decks/${studyData.deckId}`);
+        if (response.ok) {
+          const deck = await response.json();
+
+          // Filter to only wrong questions from the full deck
+          const wrongQuestions = results.incorrectAnswers.map(
+            (index) => deck.quiz_questions[index]
+          );
+
+          // Save retry data with deck info
+          const retryData = {
+            deckId: studyData.deckId,
+            deckTitle: studyData.deckTitle,
+            flashcards: deck.flashcards,
+            quiz: wrongQuestions,
+          };
+          sessionStorage.setItem("chewit_study_data", JSON.stringify(retryData));
+
+          // Clear previous results and navigate to quiz
+          sessionStorage.removeItem("chewit_quiz_results");
+          router.push("/study/quiz");
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to reload deck from Supabase:', error);
+        // Fall through to session-based retry
+      }
+    }
+
+    // Fallback: Use session storage data (original behavior)
     const wrongQuestions = results.incorrectAnswers.map(
       (index) => questions[index]
     );
 
-    // Save filtered questions to sessionStorage
     const retryData = {
-      flashcards: loadMockDataFromSession()?.flashcards || [],
+      flashcards: studyData?.flashcards || [],
       quiz: wrongQuestions,
     };
     sessionStorage.setItem(
@@ -72,6 +112,11 @@ export default function ResultsPage() {
     // Clear all session data
     sessionStorage.removeItem("chewit_study_data");
     sessionStorage.removeItem("chewit_quiz_results");
+    router.push("/");
+  };
+
+  const handleBackToDecks = () => {
+    // Keep session data, go back to home
     router.push("/");
   };
 
@@ -108,6 +153,11 @@ export default function ResultsPage() {
           <h1 className="text-3xl font-semibold text-slate-900 mb-2">
             Quiz Complete!
           </h1>
+          {deckTitle && (
+            <p className="text-sm text-slate-500 mb-2">
+              Deck: {deckTitle}
+            </p>
+          )}
           <p className="text-lg text-slate-600">{scoreBand.message}</p>
         </div>
 
@@ -201,11 +251,19 @@ export default function ResultsPage() {
           </Button>
 
           <Button
-            onClick={handleNewContent}
+            onClick={handleBackToDecks}
             variant="ghost"
             className="w-full min-h-[44px]"
           >
             <Home className="w-4 h-4 mr-2" />
+            Back to My Decks
+          </Button>
+
+          <Button
+            onClick={handleNewContent}
+            variant="ghost"
+            className="w-full min-h-[44px] text-slate-400"
+          >
             New Content
           </Button>
         </div>
