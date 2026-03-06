@@ -521,7 +521,7 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                 {decks.map((deck) => (
                   <Card
                     key={deck.id}
-                    className="bg-white border-slate-200 p-6 hover:border-slate-300 transition-colors"
+                    className="bg-white border-slate-200 p-6 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">

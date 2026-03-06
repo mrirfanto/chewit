@@ -205,7 +205,7 @@ export default function FlashcardsPage() {
               Shuffle
             </button>
           </div>
-          <Progress value={progress} className="h-2" aria-label="Flashcard progress" />
+          <Progress value={progress} className="h-2 transition-all duration-500 ease-out" aria-label="Flashcard progress" />
         </div>
 
         {/* Flashcard */}

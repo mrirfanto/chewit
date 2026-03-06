@@ -148,8 +148,8 @@ export default function ResultsPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">{scoreBand.emoji}</div>
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="text-6xl mb-4 animate-bounce">{scoreBand.emoji}</div>
           <h1 className="text-3xl font-semibold text-slate-900 mb-2">
             Quiz Complete!
           </h1>
