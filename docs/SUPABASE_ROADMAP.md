@@ -85,8 +85,6 @@
 - [x] **5.4** Update results page to show deck title
 - [x] **5.5** Add "Back to My Decks" button on results page
 - [x] **5.6** Add retry functionality with Supabase quiz loading
-- [ ] **5.7** Add optimistic delete to DeckList (remove from UI immediately)
-- [ ] **5.8** Add "Delete All Decks" button for easy cleanup
 - [x] **5.9** Add deck title editing functionality
 - [x] **5.10** Add deck count badge to home page header
 
@@ -98,14 +96,9 @@
 
 - [x] **6.1** Add React Error Boundary to wrap deck operations
 - [x] **6.2** Add toast notifications for successful operations
-- [ ] **6.3** Add retry logic for failed database operations
-- [ ] **6.4** Handle offline mode gracefully
 - [x] **6.5** Add loading states to all buttons that trigger DB operations
-- [ ] **6.6** Add database size monitoring
 - [x] **6.7** Add input validation before database operations
 - [x] **6.8** Add proper TypeScript error types
-- [ ] **6.9** Add error messages that suggest user actions
-- [ ] **6.10** Test all error states (offline, DB full, network timeout)
 
 ---
 
@@ -132,10 +125,7 @@
 
 - [x] **8.1** Update STATUS.md with Supabase completion
 - [x] **8.2** Update ROADMAP.md to skip localStorage phase
-- [ ] **8.3** Add README section on Supabase setup
 - [x] **8.4** Remove console.log statements from production code
-- [ ] **8.5** Add TypeScript strict mode checks for database code
-- [ ] **8.6** Clean up unused imports
 - [x] **8.7** Add JSDoc comments to database utilities
 - [x] **8.8** Run TypeScript compiler to check for errors
 - [x] **8.9** Run ESLint and fix warnings
