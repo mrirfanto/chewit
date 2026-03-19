@@ -8,11 +8,11 @@
 
 | Metric | Value |
 |--------|-------|
-| **Current Phase** | Phase 5: Deck Management Features |
-| **Last Updated** | 2026-03-06 |
-| **Roadmap Progress** | 92/153 tasks completed (60%) |
-| **Total Time Spent** | ~13 hours |
-| **Supabase Integration** | ✅ Complete (56/80 tasks, 70%) |
+| **Current Phase** | Phase 5: Deck Management Features (Complete) |
+| **Last Updated** | 2026-03-19 |
+| **Roadmap Progress** | ~145/153 tasks completed (~95%) |
+| **Total Time Spent** | ~18 hours |
+| **Supabase Integration** | ✅ Complete (tags, scores, pin, search, sort all wired) |
 
 ---
 
@@ -459,6 +459,15 @@
 - ✅ Integrated Supabase with generate endpoint (saves deck on generation)
 - ✅ **MAJOR MILESTONE: Cloud persistence complete!** 🎉
 
+### 2026-03-19 (Tags, Sort, Search, Pin — Full Feature Complete)
+- ✅ Tags: AI-suggested on generation, displayed on cards, inline editable, filterable with pills
+- ✅ Sort: recent / name A–Z / lowest score (server-side)
+- ✅ Search: server-side `ilike` filter with empty state
+- ✅ Pin: toggle pin with pinned section at top of list
+- ✅ Deck count header with "M of N Decks" filtered display
+- ✅ Three distinct empty states (tag filter / search / first-time)
+- ✅ Supabase migrations: last_studied_at, pinned, tags/deck_tags join table
+
 ### 2026-03-06 (Deck Management & Error Handling)
 - ✅ Supabase Phase 5-6: Enhanced deck management and error handling
 - ✅ Added deckId and deckTitle tracking throughout study flow
@@ -782,6 +791,63 @@
 
 **Open Questions:**
 - None
+
+---
+
+### 2026-03-19 — Session: Phase 4 Tags Feature (4a–4d) + Deck Management Polish
+
+**Duration:** ~5 hours
+**Phase:** Phase 5: Deck Management — Tags, Sort, Pin, Search ✅ COMPLETED
+
+**Completed (7 commits):**
+- ✅ `d4520ef` Unified Deck types, wired quiz_scores to best_score, fixed "Continue Studying" badge
+  - Consolidated Deck type in `types/index.ts` (removed duplicate definitions)
+  - Added `GET/POST /api/quiz-scores` endpoint
+  - Wired `last_studied_at` via Supabase migration (`002_add_last_studied_at.sql`)
+- ✅ `5680619` Server-side sort, pin decks, deck count header
+  - Sort options: recent, name_asc, score_asc (server-side via `listDecks`)
+  - Pin/unpin toggle via `PATCH /api/decks/[id]` + `togglePin()` in db.ts
+  - Pinned decks surfaced first; Supabase migration `003_add_pinned.sql`
+  - Deck count header above the list
+- ✅ `6efa896` Server-side search, pinned section, search empty states
+  - `?q=` param passed through API → `listDecks` → Supabase `ilike` filter
+  - Pinned section visually separated from unpinned decks
+  - Empty state for no search results
+- ✅ `a40be78` Tags schema, db functions, and GET /api/tags
+  - Supabase migration `004_add_tags.sql` (tags + deck_tags join table)
+  - `saveDeckTags`, `setDeckTags`, `getDeckTags` in db.ts
+  - `GET /api/tags` returns all distinct tag names
+- ✅ `46972aa` AI tag suggestion wired into generation flow and deck cards
+  - Claude API now suggests up to 3 tags during deck generation
+  - Tags saved via `saveDeckTags` on create
+  - Tag pills rendered on deck cards in the list
+- ✅ `d3bbcac` Inline tag editing on deck cards via PATCH /api/decks/[id]
+  - Tag dropdown UI with suggestions from `allTags`
+  - `PATCH` endpoint validates tag array (max 3, strings only, title-cased)
+  - Tags update optimistically in the deck list
+- ✅ `e3ab5eb` Tag filter pills, live tag fetch, and filtered deck count
+  - Filter pills row fetched live from `GET /api/tags` on mount
+  - Active tag state + `toggleTag()` re-triggers `loadDecks`
+  - Tags passed as `?tags=` query param (OR logic, case-insensitive)
+  - New `GET /api/decks/count` endpoint for unfiltered total
+  - Deck count shows "M of N Decks" when filtering/searching
+  - Three distinct empty states: tag filter → search → first-time
+  - Removed `PREDEFINED_TAGS` constant entirely
+  - `npx tsc --noEmit` passed clean
+
+**Updated Progress:**
+- **Total: ~145/153 tasks (~95%)**
+
+**App Status:**
+- ✅ Full tag lifecycle: AI generation → display → edit → filter
+- ✅ Sort, search, pin all server-side
+- ✅ TypeScript clean build
+- ✅ Production-ready
+
+**Next Session:**
+- Deploy latest changes to Vercel
+- Gather user feedback
+- Remaining ~8 tasks are V1.1 nice-to-haves
 
 ---
 
