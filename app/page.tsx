@@ -156,6 +156,9 @@ export default function HomePage() {
   const [editTitle, setEditTitle] = useState<string>('');
   const [editLoading, setEditLoading] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -168,6 +171,12 @@ export default function HomePage() {
   const mostRecentlyStudiedId = decks
     .filter(d => d.last_studied_at !== null)
     .sort((a, b) => new Date(b.last_studied_at!).getTime() - new Date(a.last_studied_at!).getTime())[0]?.id ?? null;
+  const pinnedDecks = decks.filter(d => d.pinned);
+  const unpinnedDecks = decks.filter(d => !d.pinned);
+  const displayedDecks = search ? decks : unpinnedDecks;
+  const hasPinnedSection = !search && pinnedDecks.length > 0;
+  const deckListHeading = hasPinnedSection ? 'Other decks' : 'Your Decks';
+  const deckListCount = hasPinnedSection ? unpinnedDecks.length : decks.length;
 
   // Handlers
   const handleContentChange = (value: string) => {
@@ -185,7 +194,7 @@ export default function HomePage() {
   const loadDecks = useCallback(async () => {
     try {
       setDecksLoading(true);
-      const response = await fetch(`/api/decks?sort=${sortBy}`);
+      const response = await fetch(`/api/decks?sort=${sortBy}&q=${encodeURIComponent(search)}`);
       if (!response.ok) throw new Error('Failed to load decks');
       const data = await response.json();
       setDecks(data.decks);
@@ -194,7 +203,13 @@ export default function HomePage() {
     } finally {
       setDecksLoading(false);
     }
-  }, [sortBy]);
+  }, [sortBy, search]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(value), 300);
+  };
 
   const handleDeleteDeck = async (deckId: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -590,12 +605,20 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
 
           {/* Recent Decks Section */}
           <div className="mt-12">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold text-slate-900">Your Decks</h2>
+            {/* Header */}
+            <div className="mb-4">
+              <h2 className="text-2xl font-semibold text-slate-900 mb-3">{deckListHeading}</h2>
               <div className="flex items-center gap-3">
-                {decks.length > 0 && (
-                  <span className="text-sm text-slate-500">
-                    {decks.length} {decks.length === 1 ? 'Deck' : 'Decks'}
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Search decks..."
+                  className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+                />
+                {deckListCount > 0 && (
+                  <span className="text-sm text-slate-500 whitespace-nowrap">
+                    {deckListCount} {deckListCount === 1 ? 'Deck' : 'Decks'}
                   </span>
                 )}
                 <select
@@ -609,6 +632,41 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                 </select>
               </div>
             </div>
+
+            {/* Pinned Section */}
+            {hasPinnedSection && (
+              <div className="mb-6">
+                <p className="text-sm text-slate-500 mb-3">Pinned</p>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {pinnedDecks.map(deck => (
+                    <div key={deck.id} className="flex-shrink-0 w-[200px] border border-slate-200 rounded-lg bg-white p-4 flex flex-col gap-2">
+                      <button
+                        onClick={() => handleLoadDeck(deck.id)}
+                        disabled={loadingDeckId === deck.id}
+                        className="text-left"
+                      >
+                        <p className="text-sm font-semibold text-slate-900 truncate">{deck.title}</p>
+                      </button>
+                      <p className="text-xs text-slate-500">
+                        {deck.best_score !== null ? `${Math.round(deck.best_score)}%` : 'Not studied'}
+                      </p>
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleTogglePin(deck.id, true)}
+                          disabled={loadingDeckId !== null}
+                          className="h-7 w-7 p-0 text-slate-900 hover:bg-slate-100"
+                          aria-label="Unpin deck"
+                        >
+                          <Pin className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Loading Skeleton — initial load only */}
             {decksLoading && decks.length === 0 && (
@@ -625,8 +683,8 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
               </div>
             )}
 
-            {/* Empty State */}
-            {!decksLoading && decks.length === 0 && (
+            {/* Empty State — no decks at all */}
+            {!decksLoading && decks.length === 0 && !search && (
               <Card className="bg-white border-slate-200 p-12 text-center">
                 <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">No decks yet</h3>
@@ -636,10 +694,15 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
               </Card>
             )}
 
+            {/* Empty State — no search results */}
+            {!decksLoading && decks.length === 0 && search && (
+              <p className="text-center text-slate-500 py-12">No decks found for &apos;{search}&apos;</p>
+            )}
+
             {/* Deck List */}
-            {decks.length > 0 && (
+            {displayedDecks.length > 0 && (
               <div className={`space-y-3 transition-opacity duration-150 ${decksLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-                {decks.map((deck, deckIndex) => (
+                {displayedDecks.map((deck, deckIndex) => (
                   <Card
                     key={deck.id}
                     className={`bg-white p-6 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${

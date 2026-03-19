@@ -14,8 +14,9 @@ export async function GET(request: NextRequest) {
     const sort: SortOption = VALID_SORTS.includes(sortParam as SortOption)
       ? (sortParam as SortOption)
       : 'recent';
+    const q = searchParams.get('q')?.trim() ?? '';
 
-    const decks = await listDecks(sort);
+    const decks = await listDecks(sort, q || undefined);
 
     return NextResponse.json({
       decks,

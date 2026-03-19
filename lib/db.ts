@@ -206,11 +206,15 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-export async function listDecks(sortBy: SortOption = 'recent'): Promise<Deck[]> {
+export async function listDecks(sortBy: SortOption = 'recent', search?: string): Promise<Deck[]> {
   try {
     let decksQuery = supabase
       .from('decks')
       .select('id, title, created_at, updated_at, last_studied_at, pinned');
+
+    if (search) {
+      decksQuery = decksQuery.ilike('title', `%${search}%`);
+    }
 
     if (sortBy === 'recent') {
       decksQuery = decksQuery
