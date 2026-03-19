@@ -362,6 +362,7 @@ export default function HomePage() {
         quiz: data.quiz,
       };
       sessionStorage.setItem('chewit_study_data', JSON.stringify(sessionData));
+      sessionStorage.setItem('chewit_tags', JSON.stringify(data.tags ?? []));
 
       await loadDecks();
       router.push('/study/flashcards');
@@ -772,6 +773,15 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                             <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">Needs review</Badge>
                           )}
                         </div>
+                        {deck.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {deck.tags.map(tag => (
+                              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">

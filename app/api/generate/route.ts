@@ -41,10 +41,15 @@ const QuestionSchema = z.object({
   answer: z.number().int().min(0).max(3, "Answer must be between 0 and 3"),
 });
 
-// Response schema
+// Response schemas
 const GenerateResponseSchema = z.object({
   flashcards: z.array(FlashcardSchema).min(10, "Must generate at least 10 flashcards").max(10, "Must generate exactly 10 flashcards"),
   quiz: z.array(QuestionSchema).min(5, "Must generate at least 5 questions").max(5, "Must generate exactly 5 questions"),
+});
+
+const FlashcardResponseSchema = z.object({
+  flashcards: z.array(FlashcardSchema).min(10, "Must generate at least 10 flashcards").max(10, "Must generate exactly 10 flashcards"),
+  tags: z.array(z.string()).max(3).default([]),
 });
 
 // ============ Prompts ============
@@ -53,7 +58,7 @@ const FLASHCARD_SYSTEM_PROMPT = `You are an expert study assistant. Your task is
 
 Rules:
 1. Return ONLY valid JSON, no markdown formatting, no preamble, no explanation
-2. Generate exactly 10 flashcards as a JSON array
+2. Generate exactly 10 flashcards
 3. Each flashcard must have:
    - "front": The concept, term, or question (max 15 words)
    - "back": A clear, concise explanation (max 50 words)
@@ -61,12 +66,23 @@ Rules:
 5. Make the front side specific and testable
 6. Make the back side informative but concise
 7. Use simple, clear language appropriate for the target audience
+8. Also suggest up to 3 tags that best describe the topic of this content.
+   Prefer tags from this predefined list:
+   JavaScript, TypeScript, React, CSS, HTML, Node.js, System Design,
+   Performance, Accessibility, Testing, Git, Browser APIs.
+   Only add a tag not from this list if none of the predefined tags fit.
+   New tags must be short (1–3 words, title case).
+   Return tags as a JSON array of strings in the "tags" field.
+   If unsure, return an empty array.
 
 Output format:
-[
-  {"front": "What is X?", "back": "X is..."},
-  ...
-]`;
+{
+  "flashcards": [
+    {"front": "What is X?", "back": "X is..."},
+    ...
+  ],
+  "tags": ["Tag1", "Tag2"]
+}`;
 
 const QUIZ_SYSTEM_PROMPT = `You are an expert study assistant. Your task is to create multiple-choice questions from educational content.
 
@@ -107,19 +123,24 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 function cleanJSONResponse(text: string): string {
   let cleaned = text.trim();
-  
-  // Remove markdown code blocks if present
   cleaned = cleaned.replace(/^```json\s*/i, "");
   cleaned = cleaned.replace(/^```\s*/i, "");
   cleaned = cleaned.replace(/```\s*$/i, "");
-  
-  // Try to find JSON array in the response
-  const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-  if (arrayMatch) {
-    cleaned = arrayMatch[0];
+
+  const objIdx = cleaned.indexOf('{');
+  const arrIdx = cleaned.indexOf('[');
+  if (objIdx !== -1 && (arrIdx === -1 || objIdx < arrIdx)) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) return match[0];
   }
-  
+  const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrayMatch) return arrayMatch[0];
+
   return cleaned.trim();
+}
+
+function titleCase(str: string): string {
+  return str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1));
 }
 
 async function callClaudeWithRetry(
@@ -204,6 +225,7 @@ export async function POST(request: NextRequest) {
         deckTitle: savedDeck.title,
         flashcards: flashcardsWithIds,
         quiz: questionsWithIds,
+        tags: [],
       });
     }
 
@@ -234,29 +256,29 @@ export async function POST(request: NextRequest) {
 
     const cleanedFlashcards = cleanJSONResponse(flashcardResponse);
 
-    let parsedFlashcards;
+    let parsedFlashcardData;
 
     try {
-      parsedFlashcards = JSON.parse(cleanedFlashcards);
+      parsedFlashcardData = JSON.parse(cleanedFlashcards);
     } catch (parseError) {
       console.error("Failed to parse flashcard JSON:", cleanedFlashcards.substring(0, 200));
       console.error("Parse error:", parseError);
       throw new Error("Failed to parse flashcard JSON from Claude response");
     }
 
-    // Validate flashcards
-    const validatedFlashcards = z.array(FlashcardSchema).safeParse(parsedFlashcards);
-    if (!validatedFlashcards.success) {
-      console.error("Flashcard validation failed:", validatedFlashcards.error.format());
+    const validatedFlashcardResponse = FlashcardResponseSchema.safeParse(parsedFlashcardData);
+    if (!validatedFlashcardResponse.success) {
+      console.error("Flashcard validation failed:", validatedFlashcardResponse.error.format());
       throw new Error("Generated flashcards do not match required schema");
     }
 
-    // Add IDs
-    const flashcards: Flashcard[] = validatedFlashcards.data.map((fc, index) => ({
+    const flashcards: Flashcard[] = validatedFlashcardResponse.data.flashcards.map((fc) => ({
       id: generateId("fc"),
       front: fc.front,
       back: fc.back,
     }));
+
+    const tags = validatedFlashcardResponse.data.tags.slice(0, 3).map(titleCase);
 
     // 7. Generate quiz
     const quizResponse = await withTimeout(
@@ -299,7 +321,7 @@ export async function POST(request: NextRequest) {
       topic_name: validated.topicName,
       flashcards: flashcards,
       quiz_questions: quiz,
-    });
+    }, tags);
 
     // 9. Return response with deck ID
     return NextResponse.json({
@@ -307,6 +329,7 @@ export async function POST(request: NextRequest) {
       deckTitle: savedDeck.title,
       flashcards,
       quiz,
+      tags,
     });
 
   } catch (error) {
