@@ -61,13 +61,11 @@ export async function getDeckTags(deckIds: string[]): Promise<Map<string, string
     .in('deck_id', deckIds);
   const map = new Map<string, string[]>();
   for (const row of data || []) {
-    const tagData = row.tags as { name: string }[] | null;
+    const tagData = row.tags as { name: string } | null;
     if (!tagData) continue;
-    for (const t of tagData) {
-      const existing = map.get(row.deck_id) ?? [];
-      existing.push(t.name);
-      map.set(row.deck_id, existing);
-    }
+    const existing = map.get(row.deck_id) ?? [];
+    existing.push(tagData.name);
+    map.set(row.deck_id, existing);
   }
   return map;
 }
