@@ -34,7 +34,45 @@ export type SortOption = 'recent' | 'score_asc' | 'name_asc';
 
 // ============ CRUD Operations ============
 
-export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
+export async function saveDeckTags(deckId: string, tagNames: string[]): Promise<void> {
+  try {
+    for (const name of tagNames) {
+      await supabase.from('tags').upsert({ name }, { onConflict: 'name' });
+      const { data: tag } = await supabase.from('tags').select('id').eq('name', name).single();
+      if (!tag) continue;
+      await supabase.from('deck_tags').upsert({ deck_id: deckId, tag_id: tag.id }, { onConflict: 'deck_id,tag_id' });
+    }
+  } catch (error) {
+    console.error('Error saving deck tags:', error);
+  }
+}
+
+export async function setDeckTags(deckId: string, tagNames: string[]): Promise<void> {
+  await supabase.from('deck_tags').delete().eq('deck_id', deckId);
+  if (tagNames.length === 0) return;
+  await saveDeckTags(deckId, tagNames);
+}
+
+export async function getDeckTags(deckIds: string[]): Promise<Map<string, string[]>> {
+  if (deckIds.length === 0) return new Map();
+  const { data } = await supabase
+    .from('deck_tags')
+    .select('deck_id, tags(name)')
+    .in('deck_id', deckIds);
+  const map = new Map<string, string[]>();
+  for (const row of data || []) {
+    const tagData = row.tags as { name: string }[] | null;
+    if (!tagData) continue;
+    for (const t of tagData) {
+      const existing = map.get(row.deck_id) ?? [];
+      existing.push(t.name);
+      map.set(row.deck_id, existing);
+    }
+  }
+  return map;
+}
+
+export async function saveDeck(params: SaveDeckParams, tags: string[] = []): Promise<Deck> {
   if (!params.title || params.title.trim().length === 0) {
     throw new ValidationError('Deck title is required', 'title');
   }
@@ -99,6 +137,8 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
       }
     }
 
+    await saveDeckTags(deck.id, tags);
+
     return {
       id: deck.id,
       title: deck.title,
@@ -108,7 +148,7 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
       last_studied_at: null,
       best_score: null,
       flashcard_count: null,
-      tags: [],
+      tags,
     };
   } catch (error) {
     if (error instanceof DatabaseError || error instanceof ValidationError) {
@@ -232,6 +272,9 @@ export async function listDecks(sortBy: SortOption = 'recent', search?: string):
     if (decksResult.error) throw decksResult.error;
     if (scoresResult.error) throw scoresResult.error;
 
+    const deckIds = (decksResult.data || []).map(d => d.id);
+    const tagsMap = await getDeckTags(deckIds);
+
     const bestScores = new Map<string, number>();
     for (const s of scoresResult.data || []) {
       if (s.total > 0) {
@@ -252,7 +295,7 @@ export async function listDecks(sortBy: SortOption = 'recent', search?: string):
       last_studied_at: d.last_studied_at ?? null,
       best_score: bestScores.get(d.id) ?? null,
       flashcard_count: null,
-      tags: [],
+      tags: tagsMap.get(d.id) ?? [],
     }));
 
     if (sortBy === 'score_asc') {
