@@ -15,8 +15,12 @@ export async function GET(request: NextRequest) {
       ? (sortParam as SortOption)
       : 'recent';
     const q = searchParams.get('q')?.trim() ?? '';
+    const tagParam = searchParams.get('tags') ?? '';
+    const tagFilter = tagParam
+      ? tagParam.split(',').map(decodeURIComponent).filter(Boolean)
+      : [];
 
-    const decks = await listDecks(sort, q || undefined);
+    const decks = await listDecks(sort, q || undefined, tagFilter.length ? tagFilter : undefined);
 
     return NextResponse.json({
       decks,

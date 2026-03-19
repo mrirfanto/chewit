@@ -246,7 +246,7 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-export async function listDecks(sortBy: SortOption = 'recent', search?: string): Promise<Deck[]> {
+export async function listDecks(sortBy: SortOption = 'recent', search?: string, tagFilter?: string[]): Promise<Deck[]> {
   try {
     let decksQuery = supabase
       .from('decks')
@@ -297,6 +297,11 @@ export async function listDecks(sortBy: SortOption = 'recent', search?: string):
       flashcard_count: null,
       tags: tagsMap.get(d.id) ?? [],
     }));
+
+    if (tagFilter && tagFilter.length > 0) {
+      const normalizedFilter = tagFilter.map(t => t.toLowerCase());
+      decks = decks.filter(d => d.tags.some(tag => normalizedFilter.includes(tag.toLowerCase())));
+    }
 
     if (sortBy === 'score_asc') {
       decks.sort((a, b) => {

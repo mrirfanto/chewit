@@ -66,11 +66,6 @@ Hooks simplify React code by making function components more powerful and elimin
 const MAX_WORDS = 10000;
 const RECOMMENDED_MIN_WORDS = 500;
 
-const PREDEFINED_TAGS = [
-  'JavaScript', 'TypeScript', 'React', 'CSS', 'HTML',
-  'Node.js', 'System Design', 'Performance', 'Accessibility',
-  'Testing', 'Git', 'Browser APIs',
-];
 const RECOMMENDED_MAX_WORDS = 5000;
 
 // ============ Helpers ============
@@ -167,6 +162,9 @@ export default function HomePage() {
   const [editingTagsDeckId, setEditingTagsDeckId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -203,16 +201,26 @@ export default function HomePage() {
   const loadDecks = useCallback(async () => {
     try {
       setDecksLoading(true);
-      const response = await fetch(`/api/decks?sort=${sortBy}&q=${encodeURIComponent(search)}`);
-      if (!response.ok) throw new Error('Failed to load decks');
-      const data = await response.json();
+      const tagParam = activeTags.length
+        ? `&tags=${activeTags.map(encodeURIComponent).join(',')}`
+        : '';
+      const [decksRes, countRes] = await Promise.all([
+        fetch(`/api/decks?sort=${sortBy}&q=${encodeURIComponent(search)}${tagParam}`),
+        fetch('/api/decks/count'),
+      ]);
+      if (!decksRes.ok) throw new Error('Failed to load decks');
+      const data = await decksRes.json();
       setDecks(data.decks);
+      if (countRes.ok) {
+        const countData = await countRes.json();
+        setTotalCount(countData.count ?? 0);
+      }
     } catch (error) {
       console.error('Error loading decks:', error);
     } finally {
       setDecksLoading(false);
     }
-  }, [sortBy, search]);
+  }, [sortBy, search, activeTags]);
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
@@ -384,6 +392,23 @@ export default function HomePage() {
     }
   };
 
+  const fetchTags = async () => {
+    try {
+      const res = await fetch('/api/tags');
+      if (!res.ok) return;
+      const data = await res.json();
+      setAllTags(data.tags ?? []);
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    }
+  };
+
+  const toggleTag = (tagName: string) => {
+    setActiveTags(prev =>
+      prev.includes(tagName) ? prev.filter(t => t !== tagName) : [...prev, tagName]
+    );
+  };
+
   const handleGenerate = useCallback(async () => {
     if (!validation.isValid || isLoading) return;
 
@@ -435,6 +460,11 @@ export default function HomePage() {
   useEffect(() => {
     loadDecks();
   }, [loadDecks]);
+
+  // Fetch all available tags on mount
+  useEffect(() => {
+    fetchTags();
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -658,6 +688,31 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
             {/* Header */}
             <div className="mb-4">
               <h2 className="text-2xl font-semibold text-slate-900 mb-3">{deckListHeading}</h2>
+              {allTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {allTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                        activeTags.includes(tag)
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                  {activeTags.length > 0 && (
+                    <button
+                      onClick={() => setActiveTags([])}
+                      className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -666,9 +721,11 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                   placeholder="Search decks..."
                   className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
                 />
-                {deckListCount > 0 && (
+                {(totalCount > 0 || activeTags.length > 0 || !!search) && (
                   <span className="text-sm text-slate-500 whitespace-nowrap">
-                    {deckListCount} {deckListCount === 1 ? 'Deck' : 'Decks'}
+                    {activeTags.length > 0 || search
+                      ? `${decks.length} of ${totalCount} ${totalCount === 1 ? 'Deck' : 'Decks'}`
+                      : `${totalCount} ${totalCount === 1 ? 'Deck' : 'Decks'}`}
                   </span>
                 )}
                 <select
@@ -733,8 +790,31 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
               </div>
             )}
 
+            {/* Empty State — tag filter returns no results */}
+            {!decksLoading && decks.length === 0 && activeTags.length > 0 && (
+              <div className="text-center py-12">
+                <p className="text-slate-500 mb-2">
+                  No decks tagged{' '}
+                  {activeTags.map((t, i) => (
+                    <span key={t}>{i > 0 ? ' or ' : ''}<strong>{t}</strong></span>
+                  ))}
+                </p>
+                <button
+                  onClick={() => setActiveTags([])}
+                  className="text-sm text-slate-400 hover:text-slate-600 underline"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+            {/* Empty State — no search results */}
+            {!decksLoading && decks.length === 0 && activeTags.length === 0 && !!search && (
+              <p className="text-center text-slate-500 py-12">No decks found for &apos;{search}&apos;</p>
+            )}
+
             {/* Empty State — no decks at all */}
-            {!decksLoading && decks.length === 0 && !search && (
+            {!decksLoading && decks.length === 0 && activeTags.length === 0 && !search && (
               <Card className="bg-white border-slate-200 p-12 text-center">
                 <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">No decks yet</h3>
@@ -742,11 +822,6 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                   Generate your first deck to get started! Paste your content above and click Generate.
                 </p>
               </Card>
-            )}
-
-            {/* Empty State — no search results */}
-            {!decksLoading && decks.length === 0 && search && (
-              <p className="text-center text-slate-500 py-12">No decks found for &apos;{search}&apos;</p>
             )}
 
             {/* Deck List */}
@@ -839,7 +914,7 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                                 onClick={() => {
                                   setEditingTagsDeckId(deck.id);
                                   setTagInput('');
-                                  setTagSuggestions(PREDEFINED_TAGS.filter(t => !deck.tags.includes(t)).slice(0, 5));
+                                  setTagSuggestions(allTags.filter(t => !deck.tags.includes(t)).slice(0, 5));
                                 }}
                                 className="text-xs text-slate-400 hover:text-slate-600 px-1"
                               >
@@ -855,7 +930,7 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                                     const v = e.target.value;
                                     setTagInput(v);
                                     setTagSuggestions(
-                                      PREDEFINED_TAGS
+                                      allTags
                                         .filter(t => t.toLowerCase().includes(v.toLowerCase()) && !deck.tags.includes(t))
                                         .slice(0, 5)
                                     );
