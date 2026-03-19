@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDeck, deleteDeck, updateDeckTitle, updateLastStudiedAt, togglePin } from '@/lib/db';
+import { getDeck, deleteDeck, updateDeckTitle, updateLastStudiedAt, togglePin, setDeckTags } from '@/lib/db';
+
+function titleCase(str: string): string {
+  return str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1));
+}
 
 /**
  * GET /api/decks/[id]
@@ -66,6 +70,21 @@ export async function PATCH(
 
     const body = await request.json();
     const { title, last_studied_at, pinned } = body;
+
+    if (typeof body.tags !== 'undefined') {
+      if (!Array.isArray(body.tags)) {
+        return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
+      }
+      if (!body.tags.every((t: unknown) => typeof t === 'string')) {
+        return NextResponse.json({ error: 'Each tag must be a string' }, { status: 400 });
+      }
+      if (body.tags.length > 3) {
+        return NextResponse.json({ error: 'Maximum 3 tags allowed' }, { status: 400 });
+      }
+      const saved = (body.tags as string[]).map(titleCase).slice(0, 3);
+      await setDeckTags(deckId, saved);
+      return NextResponse.json({ tags: saved });
+    }
 
     if (typeof pinned === 'boolean') {
       await togglePin(deckId, pinned);

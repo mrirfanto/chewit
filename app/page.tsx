@@ -65,6 +65,12 @@ You can create your own hooks to reuse stateful logic between components. Custom
 Hooks simplify React code by making function components more powerful and eliminating the need for classes in most cases. They provide a more direct API to React concepts you already know: props, state, context, refs, and lifecycle.`;
 const MAX_WORDS = 10000;
 const RECOMMENDED_MIN_WORDS = 500;
+
+const PREDEFINED_TAGS = [
+  'JavaScript', 'TypeScript', 'React', 'CSS', 'HTML',
+  'Node.js', 'System Design', 'Performance', 'Accessibility',
+  'Testing', 'Git', 'Browser APIs',
+];
 const RECOMMENDED_MAX_WORDS = 5000;
 
 // ============ Helpers ============
@@ -158,6 +164,9 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [editingTagsDeckId, setEditingTagsDeckId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -232,6 +241,8 @@ export default function HomePage() {
   };
 
   const handleLoadDeck = async (deckId: string) => {
+    setEditingTagsDeckId(null);
+    setTagInput('');
     setLoadingDeckId(deckId);
 
     try {
@@ -332,6 +343,44 @@ export default function HomePage() {
     } catch (error) {
       console.error('Error toggling pin:', error);
       setDecks(prev => prev.map(d => d.id === deckId ? { ...d, pinned: currentPinned } : d));
+    }
+  };
+
+  const handleAddTag = async (deckId: string, tagName: string) => {
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck || deck.tags.length >= 3) return;
+    const newTags = [...deck.tags, tagName];
+    setDecks(prev => prev.map(d => d.id === deckId ? { ...d, tags: newTags } : d));
+    setEditingTagsDeckId(null);
+    setTagInput('');
+    try {
+      const response = await fetch(`/api/decks/${deckId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
+      });
+      if (!response.ok) throw new Error('Failed to update tags');
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      setDecks(prev => prev.map(d => d.id === deckId ? { ...d, tags: deck.tags } : d));
+    }
+  };
+
+  const handleRemoveTag = async (deckId: string, tagName: string) => {
+    const deck = decks.find(d => d.id === deckId);
+    if (!deck) return;
+    const newTags = deck.tags.filter(t => t !== tagName);
+    setDecks(prev => prev.map(d => d.id === deckId ? { ...d, tags: newTags } : d));
+    try {
+      const response = await fetch(`/api/decks/${deckId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
+      });
+      if (!response.ok) throw new Error('Failed to update tags');
+    } catch (error) {
+      console.error('Error removing tag:', error);
+      setDecks(prev => prev.map(d => d.id === deckId ? { ...d, tags: deck.tags } : d));
     }
   };
 
@@ -773,15 +822,85 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                             <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">Needs review</Badge>
                           )}
                         </div>
-                        {deck.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="mt-1">
+                          <div className="flex flex-wrap gap-1 items-center">
                             {deck.tags.map(tag => (
-                              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              <span key={tag} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                                 {tag}
+                                <button
+                                  onClick={() => handleRemoveTag(deck.id, tag)}
+                                  className="hover:text-slate-900 leading-none ml-0.5"
+                                  aria-label={`Remove tag ${tag}`}
+                                >×</button>
                               </span>
                             ))}
+                            {editingTagsDeckId !== deck.id && deck.tags.length < 3 && (
+                              <button
+                                onClick={() => {
+                                  setEditingTagsDeckId(deck.id);
+                                  setTagInput('');
+                                  setTagSuggestions(PREDEFINED_TAGS.filter(t => !deck.tags.includes(t)).slice(0, 5));
+                                }}
+                                className="text-xs text-slate-400 hover:text-slate-600 px-1"
+                              >
+                                + Add
+                              </button>
+                            )}
+                            {editingTagsDeckId === deck.id && (
+                              <div className="relative">
+                                <input
+                                  autoFocus
+                                  value={tagInput}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setTagInput(v);
+                                    setTagSuggestions(
+                                      PREDEFINED_TAGS
+                                        .filter(t => t.toLowerCase().includes(v.toLowerCase()) && !deck.tags.includes(t))
+                                        .slice(0, 5)
+                                    );
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && tagInput.trim()) {
+                                      if (tagSuggestions.length === 1) {
+                                        handleAddTag(deck.id, tagSuggestions[0]);
+                                      } else {
+                                        handleAddTag(deck.id, tagInput.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1)));
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      setEditingTagsDeckId(null);
+                                      setTagInput('');
+                                    }
+                                  }}
+                                  onBlur={() => setTimeout(() => { setEditingTagsDeckId(null); setTagInput(''); }, 150)}
+                                  className="text-xs border border-slate-200 rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-slate-400 w-28"
+                                  placeholder="Add tag..."
+                                />
+                                {(tagSuggestions.length > 0 || (tagInput.trim().length > 0 && !tagSuggestions.some(s => s.toLowerCase() === tagInput.trim().toLowerCase()))) && (
+                                  <div className="absolute top-full left-0 z-10 mt-0.5 min-w-[150px] bg-white border border-slate-200 rounded-lg max-h-[180px] overflow-y-auto shadow-sm">
+                                    {tagSuggestions.map(s => (
+                                      <div
+                                        key={s}
+                                        onClick={() => handleAddTag(deck.id, s)}
+                                        className="px-[10px] py-[6px] text-[13px] cursor-pointer hover:bg-slate-50"
+                                      >
+                                        {s}
+                                      </div>
+                                    ))}
+                                    {tagInput.trim().length > 0 && !tagSuggestions.some(s => s.toLowerCase() === tagInput.trim().toLowerCase()) && (
+                                      <div
+                                        onClick={() => handleAddTag(deck.id, tagInput.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1)))}
+                                        className="px-[10px] py-[6px] text-[13px] cursor-pointer hover:bg-slate-50 text-slate-500"
+                                      >
+                                        Add &quot;{tagInput}&quot;
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
