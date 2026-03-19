@@ -46,6 +46,7 @@ function QuizOption({ option, index, isSelected, isCorrect, isRevealed, onSelect
       className={`
         w-full text-left px-6 py-4 rounded-lg border-2 font-medium
         transition-all duration-150
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2
         ${getOptionStyles()}
         disabled:cursor-not-allowed
       `}
@@ -271,8 +272,9 @@ export default function QuizPage() {
 
         {/* Keyboard shortcuts hint */}
         {!isRevealed && (
-          <p className="text-xs text-slate-400 text-center mt-6">
-            Press <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">1-4</kbd> to select
+          <p className="text-xs text-slate-500 text-center mt-6 leading-relaxed">
+            Press <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">1-4</kbd> to select •
+            <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono ml-1">Enter</kbd> to continue
           </p>
         )}
       </div>

@@ -224,9 +224,9 @@
 - [x] **10.4** Animate progress bar fill on flashcards page
 - [x] **10.5** Add success animation when completing quiz
 - [x] **10.6** Add subtle card hover effects on saved decks
-- [ ] **10.7** Improve color contrast for accessibility
-- [ ] **10.8** Add focus states for keyboard navigation
-- [ ] **10.9** Polish typography (line height, letter spacing)
+- [x] **10.7** Improve color contrast for accessibility
+- [x] **10.8** Add focus states for keyboard navigation
+- [x] **10.9** Polish typography (line height, letter spacing)
 - [x] **10.10** Add favicon and page title
 
 ---

@@ -161,6 +161,10 @@
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  main {
+    animation: none;
+  }
+
   .preserve-3d,
   .backface-hidden,
   .rotate-y-180 {

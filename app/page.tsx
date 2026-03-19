@@ -104,9 +104,9 @@ function validateInput(text: string): ValidationState {
 
 function getWordCountColor(wordCount: number): string {
   if (wordCount < MIN_WORDS) return 'text-red-500';
-  if (wordCount < RECOMMENDED_MIN_WORDS) return 'text-amber-500';
+  if (wordCount < RECOMMENDED_MIN_WORDS) return 'text-amber-700';
   if (wordCount > MAX_WORDS) return 'text-red-500';
-  if (wordCount > RECOMMENDED_MAX_WORDS) return 'text-amber-500';
+  if (wordCount > RECOMMENDED_MAX_WORDS) return 'text-amber-700';
   return 'text-green-600';
 }
 
@@ -379,7 +379,7 @@ export default function HomePage() {
             </p>
             <button
               onClick={handleTryExample}
-              className="mt-4 text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
+              className="mt-4 text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
             >
               Try an example
             </button>

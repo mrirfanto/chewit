@@ -36,7 +36,7 @@ function FlashcardCard({ card, isFlipped, onFlip }: FlashcardProps) {
       style={{ perspective: "1000px" }}
     >
       <div
-        className={`relative w-full min-h-[320px] cursor-pointer transition-transform duration-600 preserve-3d ${
+        className={`relative w-full min-h-[320px] cursor-pointer transition-transform duration-600 preserve-3d rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 ${
           isFlipped ? "rotate-y-180" : ""
         }`}
         onClick={onFlip}
@@ -63,7 +63,7 @@ function FlashcardCard({ card, isFlipped, onFlip }: FlashcardProps) {
             {card.front}
           </p>
           {!isFlipped && (
-            <p className="absolute bottom-6 text-sm text-slate-400">
+            <p className="absolute bottom-6 text-sm text-slate-500">
               Click or press Space to reveal
             </p>
           )}
@@ -198,7 +198,7 @@ export default function FlashcardsPage() {
             </Badge>
             <button
               onClick={handleShuffle}
-              className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 transition-colors"
+              className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1"
               aria-label="Shuffle flashcards"
             >
               <Shuffle className="w-3 h-3" />
@@ -252,7 +252,7 @@ export default function FlashcardsPage() {
         </div>
 
         {/* Keyboard shortcuts hint */}
-        <p className="text-xs text-slate-400 text-center mt-6">
+        <p className="text-xs text-slate-500 text-center mt-6 leading-relaxed">
           Press <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">Space</kbd> to flip •
           Use <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">←</kbd>
           <kbd className="px-1 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs font-mono">→</kbd> to navigate
