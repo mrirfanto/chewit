@@ -152,6 +152,22 @@ export default function QuizPage() {
         elapsedTime,
       };
       sessionStorage.setItem("chewit_quiz_results", JSON.stringify(results));
+
+      const studyData = loadMockDataFromSession();
+      if (studyData?.deckId) {
+        fetch('/api/quiz-scores', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deck_id: studyData.deckId,
+            score: results.score,
+            total: results.total,
+            incorrect_answers: incorrectAnswers,
+            time_taken: elapsedTime,
+          }),
+        }).catch(err => console.error('Failed to save quiz score:', err));
+      }
+
       router.push("/study/results");
     }
   }, [currentIndex, questions, incorrectAnswers, elapsedTime, router]);

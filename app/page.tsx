@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2, RefreshCw } from 'lucide-react';
+import { Deck } from '@/types';
 
 // ============ Types ============
 
@@ -17,11 +18,6 @@ interface ValidationState {
   error: string | null;
 }
 
-interface Deck {
-  id: string;
-  title: string;
-  created_at: string;
-}
 // ============ Constants ============
 
 const MIN_WORDS = 200;
@@ -166,6 +162,9 @@ export default function HomePage() {
   const wordCountColor = getWordCountColor(wordCount);
   const wordCountMessage = getWordCountMessage(wordCount);
   const isGenerateDisabled = !validation.isValid || isLoading;
+  const mostRecentlyStudiedId = decks
+    .filter(d => d.last_studied_at !== null)
+    .sort((a, b) => new Date(b.last_studied_at!).getTime() - new Date(a.last_studied_at!).getTime())[0]?.id ?? null;
 
   // Handlers
   const handleContentChange = (value: string) => {
@@ -221,6 +220,12 @@ export default function HomePage() {
       const response = await fetch(`/api/decks/${deckId}`);
       if (!response.ok) throw new Error('Failed to load deck');
       const data = await response.json();
+
+      fetch(`/api/decks/${deckId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_studied_at: true }),
+      }).catch(err => console.error('Failed to update last studied date:', err));
 
       const sessionData = {
         deckId: data.id,
@@ -614,7 +619,7 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        {deckIndex === 0 && editingId !== deck.id && (
+                        {mostRecentlyStudiedId === deck.id && editingId !== deck.id && (
                           <Badge variant="default" className="mb-2 text-xs bg-slate-900 text-white">
                             Continue Studying
                           </Badge>
@@ -666,6 +671,12 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                         <div className="flex items-center gap-2 text-sm text-slate-500">
                           <Clock className="w-4 h-4" />
                           <span>{formatDate(deck.created_at)}</span>
+                          {deck.best_score !== null && deck.best_score >= 80 && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 border-green-200">Mastered</Badge>
+                          )}
+                          {deck.best_score !== null && deck.best_score < 60 && (
+                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-200">Needs review</Badge>
+                          )}
                         </div>
                       </div>
 

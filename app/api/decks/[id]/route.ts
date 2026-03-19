@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDeck, deleteDeck, updateDeckTitle } from '@/lib/db';
+import { getDeck, deleteDeck, updateDeckTitle, updateLastStudiedAt } from '@/lib/db';
 
 /**
  * GET /api/decks/[id]
@@ -65,7 +65,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { title } = body;
+    const { title, last_studied_at } = body;
+
+    if (last_studied_at === true) {
+      await updateLastStudiedAt(deckId);
+      return NextResponse.json({ success: true, message: 'Last studied date updated' });
+    }
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(

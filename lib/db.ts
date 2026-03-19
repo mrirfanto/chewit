@@ -4,26 +4,15 @@
  */
 
 import { supabase } from './supabase';
-import { Flashcard, Question } from '@/types';
+import { Deck, Flashcard, Question } from '@/types';
 import { DatabaseError, ValidationError } from './errors';
 
 // ============ Types ============
-
-export interface Deck {
-  id: string;
-  title: string;
-  source_text: string;
-  topic_name: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string | null;
-}
 
 export interface DeckWithRelations extends Deck {
   flashcards: Flashcard[];
   quiz_questions: Question[];
 }
-
 
 export interface SaveDeckParams {
   title: string;
@@ -33,16 +22,17 @@ export interface SaveDeckParams {
   quiz_questions: Omit<Question, 'id'>[];
 }
 
+export interface SaveQuizScoreParams {
+  deck_id: string;
+  score: number;
+  total: number;
+  incorrect_answers: number[];
+  time_taken: number;
+}
+
 // ============ CRUD Operations ============
 
-/**
- * Save a new deck with flashcards and quiz questions to the database
- * @param params - Deck data including flashcards and questions
- * @returns The created deck with its ID
- * @throws Error if database operation fails
- */
 export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
-  // Input validation
   if (!params.title || params.title.trim().length === 0) {
     throw new ValidationError('Deck title is required', 'title');
   }
@@ -54,7 +44,6 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
   }
 
   try {
-    // 1. Create deck
     const { data: deck, error: deckError } = await supabase
       .from('decks')
       .insert({
@@ -66,18 +55,13 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
       .single();
 
     if (deckError) {
-      throw new DatabaseError(
-        'Failed to save deck',
-        deckError.code || 'DB_ERROR',
-        deckError
-      );
+      throw new DatabaseError('Failed to save deck', deckError.code || 'DB_ERROR', deckError);
     }
 
     if (!deck || !deck.id) {
       throw new DatabaseError('Failed to save deck: No ID returned', 'NO_ID');
     }
 
-    // 2. Create flashcards
     if (params.flashcards.length > 0) {
       const flashcardsWithDeckId = params.flashcards.map((fc, index) => ({
         deck_id: deck.id,
@@ -91,15 +75,10 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
         .insert(flashcardsWithDeckId);
 
       if (flashcardsError) {
-        throw new DatabaseError(
-          'Failed to save flashcards',
-          flashcardsError.code || 'DB_ERROR',
-          flashcardsError
-        );
+        throw new DatabaseError('Failed to save flashcards', flashcardsError.code || 'DB_ERROR', flashcardsError);
       }
     }
 
-    // 3. Create quiz questions
     if (params.quiz_questions.length > 0) {
       const questionsWithDeckId = params.quiz_questions.map((q, index) => ({
         deck_id: deck.id,
@@ -114,36 +93,31 @@ export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
         .insert(questionsWithDeckId);
 
       if (questionsError) {
-        throw new DatabaseError(
-          'Failed to save quiz questions',
-          questionsError.code || 'DB_ERROR',
-          questionsError
-        );
+        throw new DatabaseError('Failed to save quiz questions', questionsError.code || 'DB_ERROR', questionsError);
       }
     }
 
-    return deck;
+    return {
+      id: deck.id,
+      title: deck.title,
+      created_at: deck.created_at,
+      updated_at: deck.updated_at,
+      pinned: false,
+      last_studied_at: null,
+      best_score: null,
+      flashcard_count: null,
+      tags: [],
+    };
   } catch (error) {
     if (error instanceof DatabaseError || error instanceof ValidationError) {
       throw error;
     }
     console.error('Error saving deck:', error);
-    throw new DatabaseError(
-      'Failed to save deck',
-      'UNKNOWN_ERROR',
-      error
-    );
+    throw new DatabaseError('Failed to save deck', 'UNKNOWN_ERROR', error);
   }
 }
 
-/**
- * Get a deck with all its flashcards and quiz questions
- * @param deckId - The UUID of the deck
- * @returns The deck with related data
- * @throws Error if deck not found or database operation fails
- */
 export async function getDeck(deckId: string): Promise<DeckWithRelations> {
-  // Input validation
   if (!deckId || deckId.trim().length === 0) {
     throw new ValidationError('Deck ID is required', 'deckId');
   }
@@ -171,28 +145,29 @@ export async function getDeck(deckId: string): Promise<DeckWithRelations> {
       throw new DatabaseError(`Deck with ID ${deckId} not found`, 'PGRST116');
     }
 
-    return deck as DeckWithRelations;
+    return {
+      id: deck.id,
+      title: deck.title,
+      created_at: deck.created_at,
+      updated_at: deck.updated_at,
+      pinned: false,
+      last_studied_at: deck.last_studied_at ?? null,
+      best_score: null,
+      flashcard_count: null,
+      tags: [],
+      flashcards: deck.flashcards as Flashcard[],
+      quiz_questions: deck.quiz_questions as Question[],
+    };
   } catch (error) {
     if (error instanceof DatabaseError || error instanceof ValidationError) {
       throw error;
     }
     console.error('Error fetching deck:', error);
-    throw new DatabaseError(
-      'Failed to fetch deck',
-      'UNKNOWN_ERROR',
-      error
-    );
+    throw new DatabaseError('Failed to fetch deck', 'UNKNOWN_ERROR', error);
   }
 }
 
-
-/**
- * Delete a deck and all its related data (cascade)
- * @param deckId - The UUID of the deck to delete
- * @throws Error if database operation fails
- */
 export async function deleteDeck(deckId: string): Promise<void> {
-  // Input validation
   if (!deckId || deckId.trim().length === 0) {
     throw new ValidationError('Deck ID is required', 'deckId');
   }
@@ -204,29 +179,17 @@ export async function deleteDeck(deckId: string): Promise<void> {
       .eq('id', deckId);
 
     if (error) {
-      throw new DatabaseError(
-        'Failed to delete deck',
-        error.code || 'DB_ERROR',
-        error
-      );
+      throw new DatabaseError('Failed to delete deck', error.code || 'DB_ERROR', error);
     }
   } catch (error) {
     if (error instanceof DatabaseError || error instanceof ValidationError) {
       throw error;
     }
     console.error('Error deleting deck:', error);
-    throw new DatabaseError(
-      'Failed to delete deck',
-      'UNKNOWN_ERROR',
-      error
-    );
+    throw new DatabaseError('Failed to delete deck', 'UNKNOWN_ERROR', error);
   }
 }
 
-/**
- * Test the database connection
- * @returns true if connection is successful, false otherwise
- */
 export async function testConnection(): Promise<boolean> {
   try {
     const { error } = await supabase
@@ -241,35 +204,50 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-/**
- * List all decks (basic info only)
- * @returns Array of decks ordered by creation date (newest first)
- * @throws Error if database operation fails
- */
-export async function listDecks() {
+export async function listDecks(): Promise<Deck[]> {
   try {
-    const { data, error } = await supabase
-      .from('decks')
-      .select('id, title, created_at')
-      .order('created_at', { ascending: false });
+    const [decksResult, scoresResult] = await Promise.all([
+      supabase
+        .from('decks')
+        .select('id, title, created_at, updated_at, last_studied_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('quiz_scores')
+        .select('deck_id, score, total'),
+    ]);
 
-    if (error) throw error;
+    if (decksResult.error) throw decksResult.error;
+    if (scoresResult.error) throw scoresResult.error;
 
-    return data || [];
+    const bestScores = new Map<string, number>();
+    for (const s of scoresResult.data || []) {
+      if (s.total > 0) {
+        const pct = (s.score / s.total) * 100;
+        const current = bestScores.get(s.deck_id);
+        if (current === undefined || pct > current) {
+          bestScores.set(s.deck_id, pct);
+        }
+      }
+    }
+
+    return (decksResult.data || []).map(d => ({
+      id: d.id,
+      title: d.title,
+      created_at: d.created_at,
+      updated_at: d.updated_at,
+      pinned: false,
+      last_studied_at: d.last_studied_at ?? null,
+      best_score: bestScores.get(d.id) ?? null,
+      flashcard_count: null,
+      tags: [],
+    }));
   } catch (error) {
     console.error('Error listing decks:', error);
     throw error;
   }
 }
 
-/**
- * Update a deck's title
- * @param deckId - The UUID of the deck to update
- * @param newTitle - The new title for the deck
- * @throws Error if validation fails or database operation fails
- */
 export async function updateDeckTitle(deckId: string, newTitle: string): Promise<void> {
-  // Input validation
   if (!deckId || deckId.trim().length === 0) {
     throw new ValidationError('Deck ID is required', 'deckId');
   }
@@ -284,21 +262,62 @@ export async function updateDeckTitle(deckId: string, newTitle: string): Promise
       .eq('id', deckId);
 
     if (error) {
-      throw new DatabaseError(
-        'Failed to update deck title',
-        error.code || 'DB_ERROR',
-        error
-      );
+      throw new DatabaseError('Failed to update deck title', error.code || 'DB_ERROR', error);
     }
   } catch (error) {
-    if (error instanceof DatabaseError || error instanceof ValidationError) {
-      throw error;
-    }
+    if (error instanceof DatabaseError || error instanceof ValidationError) throw error;
     console.error('Error updating deck title:', error);
-    throw new DatabaseError(
-      'Failed to update deck title',
-      'UNKNOWN_ERROR',
-      error
-    );
+    throw new DatabaseError('Failed to update deck title', 'UNKNOWN_ERROR', error);
+  }
+}
+
+export async function updateLastStudiedAt(deckId: string): Promise<void> {
+  if (!deckId || deckId.trim().length === 0) {
+    throw new ValidationError('Deck ID is required', 'deckId');
+  }
+
+  try {
+    const { error } = await supabase
+      .from('decks')
+      .update({ last_studied_at: new Date().toISOString() })
+      .eq('id', deckId);
+
+    if (error) {
+      throw new DatabaseError('Failed to update last studied date', error.code || 'DB_ERROR', error);
+    }
+  } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) throw error;
+    console.error('Error updating last studied date:', error);
+    throw new DatabaseError('Failed to update last studied date', 'UNKNOWN_ERROR', error);
+  }
+}
+
+export async function saveQuizScore(params: SaveQuizScoreParams): Promise<{ id: string }> {
+  if (!params.deck_id) {
+    throw new ValidationError('Deck ID is required', 'deck_id');
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('quiz_scores')
+      .insert({
+        deck_id: params.deck_id,
+        score: params.score,
+        total: params.total,
+        incorrect_answers: params.incorrect_answers,
+        time_taken: params.time_taken,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      throw new DatabaseError('Failed to save quiz score', error.code || 'DB_ERROR', error);
+    }
+
+    return { id: data.id };
+  } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) throw error;
+    console.error('Error saving quiz score:', error);
+    throw new DatabaseError('Failed to save quiz score', 'UNKNOWN_ERROR', error);
   }
 }

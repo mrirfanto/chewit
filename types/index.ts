@@ -19,24 +19,18 @@ export interface Question {
   answer: number;     // Index 0-3 of correct option
 }
 
-// ============ Score Types ============
-
-export interface ScoreRecord {
-  date: string;
-  score: number;
-  total: number;
-}
-
 // ============ Deck Types ============
 
 export interface Deck {
   id: string;
   title: string;
-  createdAt: string;
-  updatedAt: string;
-  flashcards: Flashcard[];
-  quiz: Question[];
-  scores: ScoreRecord[];
+  created_at: string;
+  updated_at: string;
+  pinned: boolean;
+  last_studied_at: string | null;
+  best_score: number | null;      // Percentage 0–100, derived from quiz_scores
+  flashcard_count: number | null;
+  tags: string[];
 }
 
 // ============ Generation Types ============
@@ -49,12 +43,6 @@ export interface GenerateRequest {
 export interface GenerateResponse {
   flashcards: Flashcard[];
   quiz: Question[];
-}
-
-// ============ Storage Types ============
-
-export interface StorageDeck extends Deck {
-  version: string;  // For future migrations
 }
 
 // ============ Quiz Session Types ============
