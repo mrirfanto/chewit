@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDeck, deleteDeck, updateDeckTitle, updateLastStudiedAt } from '@/lib/db';
+import { getDeck, deleteDeck, updateDeckTitle, updateLastStudiedAt, togglePin } from '@/lib/db';
 
 /**
  * GET /api/decks/[id]
@@ -65,7 +65,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { title, last_studied_at } = body;
+    const { title, last_studied_at, pinned } = body;
+
+    if (typeof pinned === 'boolean') {
+      await togglePin(deckId, pinned);
+      return NextResponse.json({ success: true, message: 'Pin status updated' });
+    }
 
     if (last_studied_at === true) {
       await updateLastStudiedAt(deckId);

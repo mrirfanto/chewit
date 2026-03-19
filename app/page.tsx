@@ -8,10 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2, RefreshCw } from 'lucide-react';
+import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2, RefreshCw, Pin } from 'lucide-react';
 import { Deck } from '@/types';
 
 // ============ Types ============
+
+type SortOption = 'recent' | 'score_asc' | 'name_asc';
 
 interface ValidationState {
   isValid: boolean;
@@ -153,6 +155,7 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>('');
   const [editLoading, setEditLoading] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -182,7 +185,7 @@ export default function HomePage() {
   const loadDecks = useCallback(async () => {
     try {
       setDecksLoading(true);
-      const response = await fetch('/api/decks');
+      const response = await fetch(`/api/decks?sort=${sortBy}`);
       if (!response.ok) throw new Error('Failed to load decks');
       const data = await response.json();
       setDecks(data.decks);
@@ -191,7 +194,7 @@ export default function HomePage() {
     } finally {
       setDecksLoading(false);
     }
-  }, []);
+  }, [sortBy]);
 
   const handleDeleteDeck = async (deckId: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -297,6 +300,23 @@ export default function HomePage() {
       handleSaveEdit(deckId);
     } else if (e.key === 'Escape') {
       handleCancelEdit();
+    }
+  };
+
+  const handleTogglePin = async (deckId: string, currentPinned: boolean) => {
+    setDecks(prev => prev.map(d => d.id === deckId ? { ...d, pinned: !currentPinned } : d));
+
+    try {
+      const response = await fetch(`/api/decks/${deckId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: !currentPinned }),
+      });
+      if (!response.ok) throw new Error('Failed to update pin status');
+      await loadDecks();
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+      setDecks(prev => prev.map(d => d.id === deckId ? { ...d, pinned: currentPinned } : d));
     }
   };
 
@@ -572,15 +592,26 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
           <div className="mt-12">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-semibold text-slate-900">Your Decks</h2>
-              {decks.length > 0 && (
-                <Badge variant="secondary" className="text-sm">
-                  {decks.length} {decks.length === 1 ? 'Deck' : 'Decks'}
-                </Badge>
-              )}
+              <div className="flex items-center gap-3">
+                {decks.length > 0 && (
+                  <span className="text-sm text-slate-500">
+                    {decks.length} {decks.length === 1 ? 'Deck' : 'Decks'}
+                  </span>
+                )}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                >
+                  <option value="recent">Recent first</option>
+                  <option value="score_asc">Lowest score first</option>
+                  <option value="name_asc">A → Z</option>
+                </select>
+              </div>
             </div>
 
-            {/* Loading Skeleton */}
-            {decksLoading && (
+            {/* Loading Skeleton — initial load only */}
+            {decksLoading && decks.length === 0 && (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <Card key={i} className="bg-white border-slate-200 p-6">
@@ -606,8 +637,8 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
             )}
 
             {/* Deck List */}
-            {!decksLoading && decks.length > 0 && (
-              <div className="space-y-3">
+            {decks.length > 0 && (
+              <div className={`space-y-3 transition-opacity duration-150 ${decksLoading ? 'opacity-50 pointer-events-none' : ''}`}>
                 {decks.map((deck, deckIndex) => (
                   <Card
                     key={deck.id}
@@ -698,6 +729,16 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
                         </Button>
                         {editingId !== deck.id && (
                           <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleTogglePin(deck.id, deck.pinned)}
+                              disabled={loadingDeckId !== null}
+                              className={`border-slate-200 hover:bg-slate-50 ${deck.pinned ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700'}`}
+                              aria-label={deck.pinned ? 'Unpin deck' : 'Pin deck'}
+                            >
+                              <Pin className="w-4 h-4" />
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"

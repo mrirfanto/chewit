@@ -1,13 +1,21 @@
-import { NextResponse } from 'next/server';
-import { listDecks } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { listDecks, SortOption } from '@/lib/db';
+
+const VALID_SORTS: SortOption[] = ['recent', 'score_asc', 'name_asc'];
 
 /**
  * GET /api/decks
  * List all decks
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const decks = await listDecks();
+    const { searchParams } = new URL(request.url);
+    const sortParam = searchParams.get('sort') ?? 'recent';
+    const sort: SortOption = VALID_SORTS.includes(sortParam as SortOption)
+      ? (sortParam as SortOption)
+      : 'recent';
+
+    const decks = await listDecks(sort);
 
     return NextResponse.json({
       decks,

@@ -30,6 +30,8 @@ export interface SaveQuizScoreParams {
   time_taken: number;
 }
 
+export type SortOption = 'recent' | 'score_asc' | 'name_asc';
+
 // ============ CRUD Operations ============
 
 export async function saveDeck(params: SaveDeckParams): Promise<Deck> {
@@ -204,16 +206,23 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
-export async function listDecks(): Promise<Deck[]> {
+export async function listDecks(sortBy: SortOption = 'recent'): Promise<Deck[]> {
   try {
+    let decksQuery = supabase
+      .from('decks')
+      .select('id, title, created_at, updated_at, last_studied_at, pinned');
+
+    if (sortBy === 'recent') {
+      decksQuery = decksQuery
+        .order('last_studied_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+    } else if (sortBy === 'name_asc') {
+      decksQuery = decksQuery.order('title', { ascending: true });
+    }
+
     const [decksResult, scoresResult] = await Promise.all([
-      supabase
-        .from('decks')
-        .select('id, title, created_at, updated_at, last_studied_at')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('quiz_scores')
-        .select('deck_id, score, total'),
+      decksQuery,
+      supabase.from('quiz_scores').select('deck_id, score, total'),
     ]);
 
     if (decksResult.error) throw decksResult.error;
@@ -230,17 +239,30 @@ export async function listDecks(): Promise<Deck[]> {
       }
     }
 
-    return (decksResult.data || []).map(d => ({
+    let decks = (decksResult.data || []).map(d => ({
       id: d.id,
       title: d.title,
       created_at: d.created_at,
       updated_at: d.updated_at,
-      pinned: false,
+      pinned: d.pinned as boolean,
       last_studied_at: d.last_studied_at ?? null,
       best_score: bestScores.get(d.id) ?? null,
       flashcard_count: null,
       tags: [],
     }));
+
+    if (sortBy === 'score_asc') {
+      decks.sort((a, b) => {
+        if (a.best_score === null && b.best_score === null) return 0;
+        if (a.best_score === null) return -1;
+        if (b.best_score === null) return 1;
+        return a.best_score - b.best_score;
+      });
+    }
+
+    const pinned = decks.filter(d => d.pinned);
+    const unpinned = decks.filter(d => !d.pinned);
+    return [...pinned, ...unpinned];
   } catch (error) {
     console.error('Error listing decks:', error);
     throw error;
@@ -289,6 +311,27 @@ export async function updateLastStudiedAt(deckId: string): Promise<void> {
     if (error instanceof DatabaseError || error instanceof ValidationError) throw error;
     console.error('Error updating last studied date:', error);
     throw new DatabaseError('Failed to update last studied date', 'UNKNOWN_ERROR', error);
+  }
+}
+
+export async function togglePin(deckId: string, pinned: boolean): Promise<void> {
+  if (!deckId || deckId.trim().length === 0) {
+    throw new ValidationError('Deck ID is required', 'deckId');
+  }
+
+  try {
+    const { error } = await supabase
+      .from('decks')
+      .update({ pinned })
+      .eq('id', deckId);
+
+    if (error) {
+      throw new DatabaseError('Failed to update pin status', error.code || 'DB_ERROR', error);
+    }
+  } catch (error) {
+    if (error instanceof DatabaseError || error instanceof ValidationError) throw error;
+    console.error('Error toggling pin:', error);
+    throw new DatabaseError('Failed to update pin status', 'UNKNOWN_ERROR', error);
   }
 }
 
