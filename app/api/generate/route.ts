@@ -4,14 +4,12 @@ import { z } from "zod";
 import { Flashcard, Question } from "@/types";
 import { saveDeck } from "@/lib/db";
 
-// Extend Vercel serverless function timeout to 60 seconds
 export const maxDuration = 60;
 
 // ============ Mock Mode ============
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 
-// Import mock data if in mock mode
 async function getMockData() {
   if (!USE_MOCK) return null;
   const { mockStudyData } = await import("@/mocks/data");
@@ -20,53 +18,55 @@ async function getMockData() {
 
 // ============ Validation Schemas ============
 
-// Request schema
 export const GenerateRequestSchema = z.object({
   sourceText: z.string().min(100, "Content must be at least 100 characters").max(75000, "Content must not exceed 75,000 characters"),
   topicName: z.string().max(100).optional(),
 });
 
-// Flashcard schema
 const FlashcardSchema = z.object({
-  id: z.string().optional(), // Will be generated
+  id: z.string().optional(),
   front: z.string().max(200, "Flashcard front must not exceed 200 characters"),
   back: z.string().max(500, "Flashcard back must not exceed 500 characters"),
 });
 
-// Question schema
 const QuestionSchema = z.object({
-  id: z.string().optional(), // Will be generated
+  id: z.string().optional(),
   question: z.string().max(500, "Question must not exceed 500 characters"),
   options: z.array(z.string().max(200)).length(4, "Question must have exactly 4 options"),
   answer: z.number().int().min(0).max(3, "Answer must be between 0 and 3"),
 });
 
-// Response schemas
-const GenerateResponseSchema = z.object({
-  flashcards: z.array(FlashcardSchema).min(10, "Must generate at least 10 flashcards").max(10, "Must generate exactly 10 flashcards"),
-  quiz: z.array(QuestionSchema).min(5, "Must generate at least 5 questions").max(5, "Must generate exactly 5 questions"),
-});
-
 const FlashcardResponseSchema = z.object({
-  flashcards: z.array(FlashcardSchema).min(10, "Must generate at least 10 flashcards").max(10, "Must generate exactly 10 flashcards"),
+  flashcards: z.array(FlashcardSchema),
   tags: z.array(z.string()).max(3).default([]),
 });
 
+// ============ Generation Counts ============
+
+function getGenerationCounts(wordCount: number): { flashcardCount: number; quizCount: number } {
+  if (wordCount < 500)  return { flashcardCount: 5,  quizCount: 3  };
+  if (wordCount < 1500) return { flashcardCount: 8,  quizCount: 5  };
+  if (wordCount < 3000) return { flashcardCount: 12, quizCount: 7  };
+  return                       { flashcardCount: 15, quizCount: 10 };
+}
+
 // ============ Prompts ============
 
-const FLASHCARD_SYSTEM_PROMPT = `You are an expert study assistant. Your task is to create flashcards from educational content.
+const FLASHCARD_SYSTEM_PROMPT = `You are an expert study assistant. Your task is to create flashcards from educational content that comprehensively cover the entire text.
 
 Rules:
 1. Return ONLY valid JSON, no markdown formatting, no preamble, no explanation
-2. Generate exactly 10 flashcards
-3. Each flashcard must have:
+2. Before generating flashcards, mentally divide the content into major sections or themes. Distribute flashcards proportionally across ALL sections — do not cluster on the beginning of the text or on a single topic
+3. Generate exactly {flashcardCount} flashcards
+4. Each flashcard must have:
    - "front": The concept, term, or question (max 15 words)
    - "back": A clear, concise explanation (max 50 words)
-4. Focus on the most important concepts, definitions, and relationships
-5. Make the front side specific and testable
-6. Make the back side informative but concise
-7. Use simple, clear language appropriate for the target audience
-8. Also suggest up to 3 tags that best describe the topic of this content.
+5. Cover a broad range of concepts across the full text — if the content has 4 distinct sections, each section must contribute at least 1 flashcard
+6. Prioritise concepts that are: defined explicitly, contrasted with something else, or stated as important by the author
+7. Make the front side specific and testable
+8. Make the back side informative but concise
+9. Use simple, clear language appropriate for the target audience
+10. Also suggest up to 3 tags that best describe the topic of this content.
    Prefer tags from this predefined list:
    JavaScript, TypeScript, React, CSS, HTML, Node.js, System Design,
    Performance, Accessibility, Testing, Git, Browser APIs.
@@ -84,24 +84,35 @@ Output format:
   "tags": ["Tag1", "Tag2"]
 }`;
 
-const QUIZ_SYSTEM_PROMPT = `You are an expert study assistant. Your task is to create multiple-choice questions from educational content.
+const QUIZ_SYSTEM_PROMPT = `You are an expert study assistant. Your task is to create multiple-choice questions from educational content that test understanding across the entire text.
 
 Rules:
 1. Return ONLY valid JSON, no markdown formatting, no preamble, no explanation
-2. Generate exactly 5 multiple-choice questions as a JSON array
-3. Each question must have:
+2. Before generating questions, mentally divide the content into major sections or themes. Distribute questions proportionally across ALL sections — do not cluster on the beginning of the text or on a single topic
+3. Generate exactly {quizCount} multiple-choice questions as a JSON array
+4. Each question must have:
    - "question": A clear, specific question
    - "options": Exactly 4 answer choices (distractors should be plausible but clearly incorrect)
-   - "answer": The index (0-3) of the correct option
-4. Questions should test understanding, not just memorization
-5. Make distractors common misconceptions or related but incorrect concepts
-6. Ensure only one option is clearly correct
+   - "answer": The index (0–3) of the correct option
+5. Cover different sections of the content — if the content has 4 distinct sections, each section must contribute at least 1 question
+6. Questions should test understanding and application, not just memorisation or recall of surface details
+7. Make distractors common misconceptions or related but incorrect concepts
+8. Ensure only one option is clearly correct
+9. Do not repeat concepts already covered — each question should test a distinct idea
 
 Output format:
 [
   {"question": "What is X?", "options": ["A", "B", "C", "D"], "answer": 1},
   ...
 ]`;
+
+function buildFlashcardSystemPrompt(flashcardCount: number): string {
+  return FLASHCARD_SYSTEM_PROMPT.replace("{flashcardCount}", String(flashcardCount));
+}
+
+function buildQuizSystemPrompt(quizCount: number): string {
+  return QUIZ_SYSTEM_PROMPT.replace("{quizCount}", String(quizCount));
+}
 
 // ============ Helper Functions ============
 
@@ -184,13 +195,9 @@ async function callClaudeWithRetry<T>(
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Parse request body
     const body = await request.json();
-
-    // 2. Validate request
     const validated = GenerateRequestSchema.parse(body);
 
-    // 3. Check if using mock mode
     if (USE_MOCK) {
       const mockData = await getMockData();
 
@@ -201,7 +208,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Add IDs to mock data
       const flashcardsWithIds = mockData.flashcards.map(fc => ({
         ...fc,
         id: fc.id || generateId("fc"),
@@ -212,7 +218,6 @@ export async function POST(request: NextRequest) {
         id: q.id || generateId("q"),
       }));
 
-      // Generate title and save to Supabase
       const deckTitle = validated.topicName || generateTitle(validated.sourceText);
       const savedDeck = await saveDeck({
         title: deckTitle,
@@ -231,7 +236,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Check for API key
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey || apiKey === "sk-ant-your-key-here") {
       return NextResponse.json(
@@ -245,27 +249,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Initialize Claude client
     const anthropic = new Anthropic({ apiKey });
 
-    // 6. Generate flashcards and quiz in parallel
+    const wordCount = validated.sourceText.trim().split(/\s+/).filter(Boolean).length;
+    const { flashcardCount, quizCount } = getGenerationCounts(wordCount);
+
+    const flashcardValidator = FlashcardResponseSchema.extend({
+      flashcards: z.array(FlashcardSchema).min(flashcardCount).max(flashcardCount),
+    });
+    const quizValidator = z.array(QuestionSchema).min(quizCount).max(quizCount);
+
     const [flashcardData, quizData] = await Promise.all([
       callClaudeWithRetry(
         anthropic,
-        FLASHCARD_SYSTEM_PROMPT,
-        `Generate exactly 10 flashcards from the following content:\n\n${validated.sourceText}`,
+        buildFlashcardSystemPrompt(flashcardCount),
+        `Generate exactly ${flashcardCount} flashcards from the following content:\n\n${validated.sourceText}`,
         (parsed) => {
-          const result = FlashcardResponseSchema.safeParse(parsed);
+          const result = flashcardValidator.safeParse(parsed);
           if (!result.success) throw new Error("Generated flashcards do not match required schema");
           return result.data;
         }
       ),
       callClaudeWithRetry(
         anthropic,
-        QUIZ_SYSTEM_PROMPT,
-        `Generate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}`,
+        buildQuizSystemPrompt(quizCount),
+        `Generate exactly ${quizCount} multiple-choice questions from the following content:\n\n${validated.sourceText}`,
         (parsed) => {
-          const result = z.array(QuestionSchema).min(5).max(5).safeParse(parsed);
+          const result = quizValidator.safeParse(parsed);
           if (!result.success) throw new Error("Generated quiz does not match required schema");
           return result.data;
         }
@@ -287,7 +297,6 @@ export async function POST(request: NextRequest) {
       answer: q.answer,
     }));
 
-    // 7. Save to Supabase
     const deckTitle = validated.topicName || generateTitle(validated.sourceText);
     const savedDeck = await saveDeck({
       title: deckTitle,
@@ -297,7 +306,6 @@ export async function POST(request: NextRequest) {
       quiz_questions: quiz,
     }, tags);
 
-    // 9. Return response with deck ID
     return NextResponse.json({
       deckId: savedDeck.id,
       deckTitle: savedDeck.title,
@@ -309,7 +317,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Generate API error:", error);
 
-    // Handle timeout
     if (error instanceof Error && error.message === "REQUEST_TIMEOUT") {
       return NextResponse.json(
         {
@@ -322,7 +329,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
@@ -336,7 +342,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle other errors
     return NextResponse.json(
       {
         error: {
