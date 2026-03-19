@@ -22,7 +22,7 @@ interface ValidationState {
 
 // ============ Constants ============
 
-const MIN_WORDS = 200;
+const MIN_WORDS = 20;
 
 // Sample content for "Try an example" feature (~400 words)
 const SAMPLE_CONTENT = `# React Hooks: A Comprehensive Introduction
@@ -517,11 +517,11 @@ export default function HomePage() {
                   ref={textareaRef}
                   value={content}
                   onChange={(e) => handleContentChange(e.target.value)}
-                  placeholder="Paste your content here...
+                  placeholder={`Paste your content here...
 
 Articles • Notes • Transcripts • Docs • Anything you want to learn
 
-Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS} words."
+Best with ${RECOMMENDED_MIN_WORDS}–${RECOMMENDED_MAX_WORDS} words. Min: ${MIN_WORDS} words.`}
                   className={`
                   w-full min-h-[400px] px-6 py-4
                   bg-white border-slate-200 rounded-xl

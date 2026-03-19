@@ -22,7 +22,7 @@ async function getMockData() {
 
 // Request schema
 export const GenerateRequestSchema = z.object({
-  sourceText: z.string().min(200, "Source text must be at least 200 characters").max(10000, "Source text must not exceed 10000 characters"),
+  sourceText: z.string().min(100, "Content must be at least 100 characters").max(75000, "Content must not exceed 75,000 characters"),
   topicName: z.string().max(100).optional(),
 });
 
@@ -143,33 +143,35 @@ function titleCase(str: string): string {
   return str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1));
 }
 
-async function callClaudeWithRetry(
+async function callClaudeWithRetry<T>(
   client: Anthropic,
-  messages: Anthropic.MessageCreateParams["messages"],
+  system: string,
+  userMessage: string,
+  parseAndValidate: (parsed: unknown) => T,
   maxRetries = 2
-): Promise<string> {
+): Promise<T> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2000,
-        messages,
-      });
+      const response = await withTimeout(
+        client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2000,
+          system,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+        25000
+      );
 
       const content = response.content[0];
-      if (content.type === "text") {
-        return content.text;
-      }
+      if (content.type !== "text") throw new Error("Unexpected response format from Claude");
 
-      throw new Error("Unexpected response format from Claude");
+      const parsed = JSON.parse(cleanJSONResponse(content.text));
+      return parseAndValidate(parsed);
     } catch (error) {
       lastError = error as Error;
-      console.error(`Claude API attempt ${attempt + 1} failed:`, error);
-
       if (attempt < maxRetries) {
-        // Wait before retrying (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
     }
@@ -246,74 +248,46 @@ export async function POST(request: NextRequest) {
     // 5. Initialize Claude client
     const anthropic = new Anthropic({ apiKey });
 
-    // 6. Generate flashcards (25s timeout per call, leaving headroom for save)
-    const flashcardResponse = await withTimeout(
-      callClaudeWithRetry(anthropic, [
-        { role: "user", content: `${FLASHCARD_SYSTEM_PROMPT}\n\nGenerate exactly 10 flashcards from the following content:\n\n${validated.sourceText}` }
-      ]),
-      25000
-    );
+    // 6. Generate flashcards and quiz in parallel
+    const [flashcardData, quizData] = await Promise.all([
+      callClaudeWithRetry(
+        anthropic,
+        FLASHCARD_SYSTEM_PROMPT,
+        `Generate exactly 10 flashcards from the following content:\n\n${validated.sourceText}`,
+        (parsed) => {
+          const result = FlashcardResponseSchema.safeParse(parsed);
+          if (!result.success) throw new Error("Generated flashcards do not match required schema");
+          return result.data;
+        }
+      ),
+      callClaudeWithRetry(
+        anthropic,
+        QUIZ_SYSTEM_PROMPT,
+        `Generate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}`,
+        (parsed) => {
+          const result = z.array(QuestionSchema).min(5).max(5).safeParse(parsed);
+          if (!result.success) throw new Error("Generated quiz does not match required schema");
+          return result.data;
+        }
+      ),
+    ]);
 
-    const cleanedFlashcards = cleanJSONResponse(flashcardResponse);
-
-    let parsedFlashcardData;
-
-    try {
-      parsedFlashcardData = JSON.parse(cleanedFlashcards);
-    } catch (parseError) {
-      console.error("Failed to parse flashcard JSON:", cleanedFlashcards.substring(0, 200));
-      console.error("Parse error:", parseError);
-      throw new Error("Failed to parse flashcard JSON from Claude response");
-    }
-
-    const validatedFlashcardResponse = FlashcardResponseSchema.safeParse(parsedFlashcardData);
-    if (!validatedFlashcardResponse.success) {
-      console.error("Flashcard validation failed:", validatedFlashcardResponse.error.format());
-      throw new Error("Generated flashcards do not match required schema");
-    }
-
-    const flashcards: Flashcard[] = validatedFlashcardResponse.data.flashcards.map((fc) => ({
+    const flashcards: Flashcard[] = flashcardData.flashcards.map((fc) => ({
       id: generateId("fc"),
       front: fc.front,
       back: fc.back,
     }));
 
-    const tags = validatedFlashcardResponse.data.tags.slice(0, 3).map(titleCase);
+    const tags = flashcardData.tags.slice(0, 3).map(titleCase);
 
-    // 7. Generate quiz
-    const quizResponse = await withTimeout(
-      callClaudeWithRetry(anthropic, [
-        { role: "user", content: `${QUIZ_SYSTEM_PROMPT}\n\nGenerate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}` }
-      ]),
-      25000
-    );
-
-    const cleanedQuiz = cleanJSONResponse(quizResponse);
-    let parsedQuiz;
-
-    try {
-      parsedQuiz = JSON.parse(cleanedQuiz);
-    } catch (parseError) {
-      console.error("Failed to parse quiz JSON:", cleanedQuiz.substring(0, 200));
-      throw new Error("Failed to parse quiz JSON from Claude response");
-    }
-
-    // Validate quiz
-    const validatedQuiz = z.array(QuestionSchema).safeParse(parsedQuiz);
-    if (!validatedQuiz.success) {
-      console.error("Quiz validation failed:", validatedQuiz.error.format());
-      throw new Error("Generated quiz does not match required schema");
-    }
-
-    // Add IDs
-    const quiz: Question[] = validatedQuiz.data.map((q, index) => ({
+    const quiz: Question[] = quizData.map((q) => ({
       id: generateId("q"),
       question: q.question,
       options: q.options,
       answer: q.answer,
     }));
 
-    // 8. Save to Supabase
+    // 7. Save to Supabase
     const deckTitle = validated.topicName || generateTitle(validated.sourceText);
     const savedDeck = await saveDeck({
       title: deckTitle,
