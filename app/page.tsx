@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2 } from 'lucide-react';
+import { Zap, AlertCircle, Loader2, Trash2, BookOpen, Clock, Check, X, Edit2, RefreshCw } from 'lucide-react';
 
 // ============ Types ============
 
@@ -150,6 +150,7 @@ export default function HomePage() {
   // State
   const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [decksLoading, setDecksLoading] = useState<boolean>(true);
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null);
@@ -173,6 +174,7 @@ export default function HomePage() {
 
   const handleClear = () => {
     setContent('');
+    setGenerationError(null);
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
@@ -297,6 +299,7 @@ export default function HomePage() {
     if (!validation.isValid || isLoading) return;
 
     setIsLoading(true);
+    setGenerationError(null);
 
     try {
       const response = await fetch('/api/generate', {
@@ -324,7 +327,7 @@ export default function HomePage() {
       router.push('/study/flashcards');
     } catch (error) {
       console.error('Generation error:', error);
-      alert(
+      setGenerationError(
         error instanceof Error
           ? error.message
           : 'Failed to generate flashcards. Please try again.'
@@ -538,6 +541,28 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
             </div>
           )}
 
+          {/* Generation Error */}
+          {generationError && !isLoading && (
+            <div className="mt-6" role="alert" aria-live="assertive">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-4">
+                  <span>{generationError}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerate}
+                    disabled={!validation.isValid}
+                    className="shrink-0 border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Try Again
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
           {/* Recent Decks Section */}
           <div className="mt-12">
             <div className="flex items-center justify-between mb-4">
@@ -578,13 +603,22 @@ Best with {RECOMMENDED_MIN_WORDS}-{RECOMMENDED_MAX_WORDS} words. Min: {MIN_WORDS
             {/* Deck List */}
             {!decksLoading && decks.length > 0 && (
               <div className="space-y-3">
-                {decks.map((deck) => (
+                {decks.map((deck, deckIndex) => (
                   <Card
                     key={deck.id}
-                    className="bg-white border-slate-200 p-6 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                    className={`bg-white p-6 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${
+                      deckIndex === 0
+                        ? 'border-slate-900 hover:border-slate-900'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
+                        {deckIndex === 0 && editingId !== deck.id && (
+                          <Badge variant="default" className="mb-2 text-xs bg-slate-900 text-white">
+                            Continue Studying
+                          </Badge>
+                        )}
                         {editingId === deck.id ? (
                           <div className="flex items-center gap-2 mb-1">
                             <input

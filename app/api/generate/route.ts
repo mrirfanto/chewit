@@ -4,6 +4,9 @@ import { z } from "zod";
 import { Flashcard, Question } from "@/types";
 import { saveDeck } from "@/lib/db";
 
+// Extend Vercel serverless function timeout to 60 seconds
+export const maxDuration = 60;
+
 // ============ Mock Mode ============
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
@@ -93,6 +96,13 @@ function generateId(prefix: string): string {
 function generateTitle(sourceText: string): string {
   const words = sourceText.trim().split(/\s+/).slice(0, 5);
   return words.join(" ") + "...";
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), ms)
+  );
+  return Promise.race([promise, timeout]);
 }
 
 function cleanJSONResponse(text: string): string {
@@ -214,10 +224,13 @@ export async function POST(request: NextRequest) {
     // 5. Initialize Claude client
     const anthropic = new Anthropic({ apiKey });
 
-    // 6. Generate flashcards
-    const flashcardResponse = await callClaudeWithRetry(anthropic, [
-      { role: "user", content: `${FLASHCARD_SYSTEM_PROMPT}\n\nGenerate exactly 10 flashcards from the following content:\n\n${validated.sourceText}` }
-    ]);
+    // 6. Generate flashcards (25s timeout per call, leaving headroom for save)
+    const flashcardResponse = await withTimeout(
+      callClaudeWithRetry(anthropic, [
+        { role: "user", content: `${FLASHCARD_SYSTEM_PROMPT}\n\nGenerate exactly 10 flashcards from the following content:\n\n${validated.sourceText}` }
+      ]),
+      25000
+    );
 
     const cleanedFlashcards = cleanJSONResponse(flashcardResponse);
 
@@ -246,9 +259,12 @@ export async function POST(request: NextRequest) {
     }));
 
     // 7. Generate quiz
-    const quizResponse = await callClaudeWithRetry(anthropic, [
-      { role: "user", content: `${QUIZ_SYSTEM_PROMPT}\n\nGenerate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}` }
-    ]);
+    const quizResponse = await withTimeout(
+      callClaudeWithRetry(anthropic, [
+        { role: "user", content: `${QUIZ_SYSTEM_PROMPT}\n\nGenerate exactly 5 multiple-choice questions from the following content:\n\n${validated.sourceText}` }
+      ]),
+      25000
+    );
 
     const cleanedQuiz = cleanJSONResponse(quizResponse);
     let parsedQuiz;
@@ -295,6 +311,19 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Generate API error:", error);
+
+    // Handle timeout
+    if (error instanceof Error && error.message === "REQUEST_TIMEOUT") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "TIMEOUT_ERROR",
+            message: "Generation timed out. The AI is taking too long — please try again.",
+          },
+        },
+        { status: 408 }
+      );
+    }
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {

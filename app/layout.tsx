@@ -15,6 +15,10 @@ export const metadata: Metadata = {
   description: "Transform any content into interactive flashcards and quizzes powered by AI",
 };
 
+const isMissingApiKey =
+  !process.env.ANTHROPIC_API_KEY ||
+  process.env.ANTHROPIC_API_KEY === "sk-ant-your-key-here";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,6 +29,13 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ErrorBoundary>
           <Header />
+          {isMissingApiKey && process.env.NODE_ENV === "development" && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800">
+              ⚠️ <strong>ANTHROPIC_API_KEY</strong> is not set. Add it to{" "}
+              <code className="font-mono bg-amber-100 px-1 rounded">.env.local</code>{" "}
+              or set <code className="font-mono bg-amber-100 px-1 rounded">USE_MOCK_DATA=true</code>.
+            </div>
+          )}
           <main className="min-h-[calc(100vh-4rem)]">
             {children}
           </main>

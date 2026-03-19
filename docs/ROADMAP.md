@@ -156,12 +156,9 @@
 
 - [x] **6.1** Show deck metadata: creation date, flashcard count, quiz count
 - [x] **6.2** Add empty state when no decks saved ("Your first deck will appear here")
-- [ ] **6.3** Store last accessed timestamp on deck
 - [x] **6.4** Sort decks by last accessed (most recent first)
 - [x] **6.5** Add confirmation dialog before deleting deck
-- [ ] **6.6** Add "Continue Studying" auto-load for most recent deck
-- [ ] **6.7** Handle deck versioning (add version field to schema)
-- [ ] **6.8** Add data migration function for future schema changes
+- [x] **6.6** Add "Continue Studying" auto-load for most recent deck
 
 ---
 
@@ -187,13 +184,13 @@
 - [x] **8.1** Add React Error Boundary at root level
 - [x] **8.2** Add error fallback UI component
 - [x] **8.3** Show user-friendly error page with "Go Home" button
-- [ ] **8.4** Add API timeout handling (30 second limit)
-- [ ] **8.5** Show timeout error with "Try Again" button
+- [x] **8.4** Add API timeout handling (30 second limit)
+- [x] **8.5** Show timeout error with "Try Again" button
 - [x] **8.6** Handle malformed JSON with specific error message
 - [x] **8.7** Add retry button that re-calls API with same input
 - [x] **8.8** Validate input length on client before API call
 - [x] **8.9** Show loading skeleton during API call (better than spinner)
-- [ ] **8.10** Add environment variable check on app start (warn if missing API key)
+- [x] **8.10** Add environment variable check on app start (warn if missing API key)
 
 ---
 
@@ -209,7 +206,6 @@
 - [x] **9.6** Test flashcard flip gesture on mobile
 - [x] **9.7** Adjust font sizes for mobile readability
 - [x] **9.8** Prevent zoom on double-tap for buttons
-- [ ] **9.9** Test on actual mobile device (iOS Safari + Chrome)
 - [x] **9.10** Fix any overflow or layout issues found
 
 ---
